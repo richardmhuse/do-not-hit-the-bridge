@@ -1,3 +1,83 @@
-requests
-pandas
-ephem
+# Bridge Clearance Dashboard
+
+A small Flask app that displays a live, smoothed tidal chart for the
+UNCW-02 gauge, sourced directly from `measured.csv` in the
+**NOAA-Data-Pipeline-V2** repo. There's no GitHub Action in this repo by
+design — the app fetches the CSV live from
+`raw.githubusercontent.com` on every request (with a short server-side
+cache), so the dashboard always reflects whatever's currently on the data
+repo's `main` branch.
+
+## How it works
+
+- `tide_data.py` downloads the CSV, auto-detects the timestamp/value
+  columns, keeps the last `LOOKBACK_DAYS` of readings, and applies a
+  Savitzky–Golay filter to smooth the curve for display.
+- `app.py` exposes `/api/data` (JSON) and serves the dashboard page.
+- `static/app.js` polls `/api/data` and redraws the Plotly chart —
+  no page reload needed.
+- Bridge clearance math isn't wired up yet; the chart currently shows raw
+  water level. Once you have a fixed datum/offset (bridge deck height
+  minus gauge datum), that subtraction can be added in `tide_data.py`
+  and surfaced as its own "clearance" field.
+
+## Configuration
+
+Set these as environment variables (defaults shown), both locally and on
+Render:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GITHUB_OWNER` | `YOUR_GITHUB_USERNAME` | **Set this** — the GitHub username/org that owns both repos |
+| `DATA_REPO` | `NOAA-Data-Pipeline-V2` | Repo containing `measured.csv` |
+| `DATA_BRANCH` | `main` | Branch to read from |
+| `DATA_PATH` | `data/raw/measured.csv` | Path within the data repo |
+| `CACHE_TTL_SECONDS` | `300` | How long fetched CSV data is cached server-side |
+| `LOOKBACK_DAYS` | `7` | How much history to show |
+| `REFRESH_MS` | `60000` | How often the browser polls `/api/data` |
+
+**Before deploying, update `GITHUB_OWNER` in `render.yaml`** (or set it as
+an env var in the Render dashboard) to your actual GitHub username.
+
+If `data/raw/measured.csv` is in a **private** repo, `raw.githubusercontent.com`
+will 404 for anonymous requests — see "Private data repo" below.
+
+## Local development
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export GITHUB_OWNER=your-username
+python app.py
+# visit http://localhost:5000
+```
+
+## Deploying to Render
+
+1. Push this repo to GitHub.
+2. In Render: **New +** → **Blueprint**, point it at this repo. Render
+   will read `render.yaml` and create the web service automatically.
+   (Or create a Web Service manually with build command
+   `pip install -r requirements.txt` and start command
+   `gunicorn app:app --bind 0.0.0.0:$PORT`.)
+3. Set `GITHUB_OWNER` in the Render service's environment variables.
+4. Deploy. The dashboard fetches live data on every page load/poll, so
+   no redeploys are needed when `measured.csv` updates upstream.
+
+## Private data repo
+
+If `NOAA-Data-Pipeline-V2` is private, anonymous fetches to
+`raw.githubusercontent.com` will fail. In that case, switch
+`tide_data.py` to use the GitHub Contents API with a token instead:
+
+```python
+url = f"https://api.github.com/repos/{GITHUB_OWNER}/{DATA_REPO}/contents/{DATA_PATH}?ref={DATA_BRANCH}"
+resp = requests.get(url, headers={
+    "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+    "Accept": "application/vnd.github.raw+json",
+}, timeout=20)
+```
+
+and add a `GITHUB_TOKEN` (fine-grained PAT with read-only contents access
+to that one repo) as a Render environment variable / secret.
