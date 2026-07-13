@@ -14,44 +14,52 @@ on:
 permissions:
   contents: write
 
-jobs:
-  mirror:
+ fetch:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout this repo (do-not-hit-the-bridge)
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout measured.csv from the private data repo
-        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          repository: richardmhuse/NOAA-Data-Pipeline-V2
-          token: ${{ secrets.SOURCE_REPO_TOKEN }}
-          sparse-checkout: |
-            data/raw/measured.csv
-          sparse-checkout-cone-mode: false
-          path: source-data
+          python-version: '3.11'
 
-      - name: Copy measured.csv into this repo
+      - name: Install dependencies
         run: |
-          set -euo pipefail
-          if [ ! -f source-data/data/raw/measured.csv ]; then
-            echo "::error::measured.csv not found at data/raw/measured.csv in the source repo"
-            exit 1
-          fi
-          mkdir -p data
-          cp source-data/data/raw/measured.csv data/measured.csv
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Commit and push if changed
+      # Ensure directories exist
+      - name: Create data directories
         run: |
-          set -euo pipefail
-          git config user.name "measured-csv-mirror-bot"
-          git config user.email "actions@users.noreply.github.com"
+          mkdir -p data/raw
+      
 
-          if git diff --quiet -- data/measured.csv; then
-            echo "No changes to mirror."
-            exit 0
-          fi
+      # Fetch datasets
+      
+      - name: Fetch measurement data
+        run: python scripts/fetch_uncw_02.py
 
-          git add data/measured.csv
-          git commit -m "Mirror measured.csv ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+      # Show generated files for debugging
+      - name: List generated files
+        run: |
+          echo "RAW DATA:"
+          ls -lah data/raw || true
+
+          echo ""
+          echo "PROCESSED DATA:"
+          ls -lah data/processed || true
+
+      # Commit updated data
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add data/
+
+          git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M') UTC" || echo "No changes to commit"
+
           git push
