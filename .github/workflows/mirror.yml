@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-
  fetch:
     runs-on: ubuntu-latest
 
