@@ -1,20 +1,15 @@
-name: Mirror measured.csv from NOAA-Data-Pipeline-V2
-
-# This workflow belongs in the do-not-hit-the-bridge (public) repo.
-# It pulls data/raw/measured.csv from the private NOAA-Data-Pipeline-V2
-# repo using a read-only PAT, and commits it here as data/measured.csv
-# so the (anonymous, token-free) web app can fetch it from
-# raw.githubusercontent.com.
+name: mirror.yml
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes
-  workflow_dispatch: {}       # allow manual "Run workflow" from the Actions tab
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
-  Jobs:
- fetch:
+
+jobs:
+  fetch:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,10 +30,9 @@ permissions:
       - name: Create data directories
         run: |
           mkdir -p data/raw
-      
+          mkdir -p data/processed
 
       # Fetch datasets
-      
       - name: Fetch measurement data
         run: python scripts/fetch_uncw_02.py
 
