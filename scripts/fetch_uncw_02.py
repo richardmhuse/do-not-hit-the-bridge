@@ -51,6 +51,9 @@ def to_dataframe(data: dict) -> pd.DataFrame:
     # Parse timestamp
     df["at"] = pd.to_datetime(df["at"])
 
+   # Shift tidal values up by 2
+    df["value"] = df["value"] + 2
+
     # Friendly parameter name (falls back to raw code if unmapped)
     df["parameter"] = df["code"].map(PARAMETER_CODES).fillna(df["code"])
 
