@@ -29,7 +29,7 @@ jobs:
       # Ensure directories exist
       - name: Create data directories
         run: |
-          mkdir -p data/raw
+          mkdir -p data
           mkdir -p data/processed
 
       # Fetch datasets
@@ -40,7 +40,7 @@ jobs:
       - name: List generated files
         run: |
           echo "RAW DATA:"
-          ls -lah data/raw || true
+          ls -lah data || true
 
           echo ""
           echo "PROCESSED DATA:"
