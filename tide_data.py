@@ -37,14 +37,24 @@ DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
 DATA_PATH = os.environ.get("DATA_PATH", "data/measured.csv")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
-LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "5"))
+
+# Selectable lookback/lookahead windows, surfaced as buttons in the UI.
+ALLOWED_LOOKBACK_DAYS = (1, 3, 5)
+ALLOWED_LOOKAHEAD_DAYS = (1, 3, 5)
+DEFAULT_LOOKBACK_DAYS = 1
+DEFAULT_LOOKAHEAD_DAYS = 1
+
+# How much raw history to keep cached in memory (must cover the largest
+# lookback option). Switching the lookback selector re-slices this cached
+# frame instead of re-fetching from GitHub each time.
+CACHE_WINDOW_DAYS = float(os.environ.get("CACHE_WINDOW_DAYS", str(max(ALLOWED_LOOKBACK_DAYS))))
 
 RAW_URL = (
     f"https://raw.githubusercontent.com/"
     f"{GITHUB_OWNER}/{DATA_REPO}/{DATA_BRANCH}/{DATA_PATH}"
 )
 
-_cache = {"timestamp": 0.0, "payload": None}
+_cache = {"timestamp": 0.0, "df": None, "time_col": None, "value_col": None}
 
 TIME_COL_HINTS = ("date", "time", "timestamp")
 VALUE_COL_HINTS = ("level", "gauge", "stage", "value", "measurement", "ft", "feet", "water")
@@ -99,13 +109,12 @@ def _smooth(values: np.ndarray) -> np.ndarray:
         return pd.Series(values).rolling(window=5, center=True, min_periods=1).mean().to_numpy()
 
 
-def fetch_tide_data(force: bool = False) -> dict:
-    """Returns a dict with raw + smoothed series, using a short-lived
-    in-memory cache so a burst of dashboard visitors doesn't hammer
-    raw.githubusercontent.com."""
+def _fetch_raw(force: bool = False):
+    """Fetches + caches the raw dataframe (up to CACHE_WINDOW_DAYS of
+    history). This is the only function that hits the network."""
     now = time.time()
-    if not force and _cache["payload"] is not None and (now - _cache["timestamp"]) < CACHE_TTL_SECONDS:
-        return _cache["payload"]
+    if not force and _cache["df"] is not None and (now - _cache["timestamp"]) < CACHE_TTL_SECONDS:
+        return _cache["df"], _cache["time_col"], _cache["value_col"]
 
     resp = requests.get(RAW_URL, timeout=20)
     resp.raise_for_status()
@@ -118,17 +127,42 @@ def fetch_tide_data(force: bool = False) -> dict:
     df = df.sort_values(time_col).drop_duplicates(subset=[time_col])
 
     if not df.empty:
-        cutoff = df[time_col].max() - pd.Timedelta(days=LOOKBACK_DAYS)
+        cutoff = df[time_col].max() - pd.Timedelta(days=CACHE_WINDOW_DAYS)
         df = df[df[time_col] >= cutoff]
 
     if df.empty:
         raise ValueError("No usable rows found in measured.csv after filtering.")
 
-    raw_values = df[value_col].to_numpy(dtype=float)
+    _cache.update(timestamp=now, df=df, time_col=time_col, value_col=value_col)
+    return df, time_col, value_col
+
+
+def fetch_tide_data(
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    lookahead_days: int = DEFAULT_LOOKAHEAD_DAYS,
+    force: bool = False,
+) -> dict:
+    """Returns a dict with raw + smoothed series for the requested lookback
+    window. lookahead_days isn't used to fetch anything yet (there's no
+    forecast source wired up) — it's passed straight through so the
+    frontend can reserve visual space for predictive analytics later."""
+    if lookback_days not in ALLOWED_LOOKBACK_DAYS:
+        lookback_days = DEFAULT_LOOKBACK_DAYS
+    if lookahead_days not in ALLOWED_LOOKAHEAD_DAYS:
+        lookahead_days = DEFAULT_LOOKAHEAD_DAYS
+
+    df, time_col, value_col = _fetch_raw(force=force)
+
+    cutoff = df[time_col].max() - pd.Timedelta(days=lookback_days)
+    view = df[df[time_col] >= cutoff]
+    if view.empty:
+        view = df
+
+    raw_values = view[value_col].to_numpy(dtype=float)
     smoothed_values = _smooth(raw_values)
 
     payload = {
-        "timestamps": df[time_col].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist(),
+        "timestamps": view[time_col].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist(),
         "raw": raw_values.tolist(),
         "smoothed": smoothed_values.tolist(),
         "value_column": value_col,
@@ -136,9 +170,10 @@ def fetch_tide_data(force: bool = False) -> dict:
         "source_url": RAW_URL,
         "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "latest_value": float(smoothed_values[-1]),
-        "latest_timestamp": df[time_col].iloc[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "latest_timestamp": view[time_col].iloc[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "lookback_days": lookback_days,
+        "lookahead_days": lookahead_days,
+        "forecast": [],  # reserved for predictive analytics
     }
 
-    _cache["timestamp"] = now
-    _cache["payload"] = payload
     return payload
