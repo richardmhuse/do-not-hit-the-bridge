@@ -1,6 +1,6 @@
 const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT = window.__BRIDGE_CLEARANCE_FT__;
-const WARNING_MARGIN_FT = 1.0; // tint the readout amber within this margin of the threshold
+const WARNING_MARGIN_FT = .2; // tint the readout amber within this margin of the threshold
 
 const dot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
