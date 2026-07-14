@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Whiskey Creek &middot; Live Gauge</title>
+  <title>Bridge Clearance &middot; Live Gauge</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 </head>
@@ -17,7 +17,7 @@
     <div class="error-banner" id="error-banner"></div>
 
     <div class="hero">
-      <p class="hero-label">Water Level &middot; Whiskey Creek</p>
+      <p class="hero-label">Water Level &middot; UNCW-02 Gauge</p>
       <p class="hero-readout" id="readout">
         &mdash;<span class="unit">ft</span>
       </p>
@@ -28,12 +28,23 @@
       <div id="chart"></div>
     </div>
 
-  
+    <div class="footer">
+      Data pulled live from
+      <a href="{{ source_url }}" target="_blank" rel="noopener">measured.csv</a>
+      in the NOAA-Data-Pipeline-V2 repository. Smoothed with a Savitzky&ndash;Golay
+      filter for display; raw readings shown faintly beneath the curve. The
+      amber dashed line marks the {{ bridge_clearance_ft }}ft bridge
+      clearance threshold; the red dashed line marks the
+      {{ min_water_depth_ft }}ft minimum water depth. Refreshes every
+      {{ (refresh_ms / 1000) | int }}s.
+    </div>
+  </div>
 
   <script>
     window.__REFRESH_MS__ = {{ refresh_ms }};
     window.__BRIDGE_CLEARANCE_FT__ = {{ bridge_clearance_ft }};
-</script>
+    window.__MIN_WATER_DEPTH_FT__ = {{ min_water_depth_ft }};
+  </script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
