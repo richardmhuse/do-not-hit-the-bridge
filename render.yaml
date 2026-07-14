@@ -17,9 +17,12 @@ services:
       - key: CACHE_TTL_SECONDS
         value: "300"
       - key: LOOKBACK_DAYS
-        value: "5"
+        value: "7"
       - key: REFRESH_MS
         value: "60000"
       - key: BRIDGE_CLEARANCE_FT
         value: "4.81"
+      - key: MIN_WATER_DEPTH_FT
+        value: "1.2"
     healthCheckPath: /healthz
+
