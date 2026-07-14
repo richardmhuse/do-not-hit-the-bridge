@@ -17,7 +17,7 @@ services:
       - key: CACHE_TTL_SECONDS
         value: "300"
       - key: LOOKBACK_DAYS
-        value: "7"
+        value: "5"
       - key: REFRESH_MS
         value: "60000"
     healthCheckPath: /healthz
