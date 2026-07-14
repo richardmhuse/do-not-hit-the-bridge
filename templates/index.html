@@ -28,14 +28,7 @@
       <div id="chart"></div>
     </div>
 
-    <div class="footer">
-      Data pulled live from
-      <a href="{{ source_url }}" target="_blank" rel="noopener">measured.csv</a>
-      in the NOAA-Data-Pipeline-V2 repository. Smoothed with a Savitzky&ndash;Golay
-      filter for display; raw readings shown faintly beneath the curve.
-      Refreshes every {{ (refresh_ms / 1000) | int }}s.
-    </div>
-  </div>
+  
 
   <script>
     window.__REFRESH_MS__ = {{ refresh_ms }};
