@@ -7,6 +7,7 @@
   --chart-line: #35c6c4;
   --chart-line-dim: rgba(53, 198, 196, 0.25);
   --alert-amber: #f2a93c;
+  --alert-low: #ef6461;
   --fog: #7c93a8;
   --foam: #e8f1f5;
 
@@ -116,9 +117,14 @@ body {
   font-weight: 500;
 }
 
-.hero-readout.near-limit {
+.hero-readout.near-limit-high {
   color: var(--alert-amber);
   text-shadow: 0 0 18px rgba(242, 169, 60, 0.35), 0 0 3px rgba(242, 169, 60, 0.6);
+}
+
+.hero-readout.near-limit-low {
+  color: var(--alert-low);
+  text-shadow: 0 0 18px rgba(239, 100, 97, 0.35), 0 0 3px rgba(239, 100, 97, 0.6);
 }
 
 .hero-meta {
