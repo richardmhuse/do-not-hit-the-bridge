@@ -37,7 +37,7 @@ DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
 DATA_PATH = os.environ.get("DATA_PATH", "data/measured.csv")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
-LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "7"))
+LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "5"))
 
 RAW_URL = (
     f"https://raw.githubusercontent.com/"
