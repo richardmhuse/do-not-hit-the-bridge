@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bridge-clearance-dashboard
+    name: Whiskey Tides
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
