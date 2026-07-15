@@ -2,8 +2,8 @@ const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
-  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
-const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
+  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
+const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
