@@ -106,7 +106,7 @@ function buildTraces(data) {
 function setStatus(ok) {
   dot.classList.toggle("stale", !ok);
   statusText.textContent = ok
-    ? "Live \u00b7 UNCW-02 gauge feed"
+    ? "Live \u00b7 Whiskey Creek"
     : "Feed unavailable \u2014 showing last known data";
 }
 
