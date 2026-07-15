@@ -2,8 +2,8 @@ const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
-  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
-const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
+const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
@@ -106,8 +106,117 @@ function buildTraces(data) {
 function setStatus(ok) {
   dot.classList.toggle("stale", !ok);
   statusText.textContent = ok
-    ? "Live \u00b7 Whiskey Creek"
+    ? "Live \u00b7 UNCW-02 gauge feed"
     : "Feed unavailable \u2014 showing last known data";
+}
+
+/**
+ * Plotly's built-in scrollZoom config reliably handles mouse-wheel zoom
+ * and pinch-zoom on map/3D subplots, but doesn't reliably translate a
+ * two-finger pinch into a zoom on plain SVG cartesian charts (like this
+ * one) across mobile browsers — it tends to fall through to treating it
+ * as a single-finger pan, which is exactly the bug this works around.
+ *
+ * This attaches raw touch listeners directly to the chart div, in the
+ * capture phase, so we see two-finger touches before Plotly's own
+ * (bubble-phase) pan handler does. Single-finger touches are left
+ * completely alone and continue to work exactly as before (normal pan).
+ * Only once a second finger comes down do we take over: we read Plotly's
+ * internal axis pixel<->data conversion (`_fullLayout.<axis>.p2d`) to
+ * find the data coordinate under the pinch midpoint, then scale the
+ * visible x/y range around that point as the two fingers move apart or
+ * together, applying it via Plotly.relayout.
+ */
+function setupPinchZoom(gd) {
+  let pinchState = null;
+
+  function touchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function touchMidpoint(touches) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }
+
+  function beginPinch(e) {
+    const fullLayout = gd._fullLayout;
+    const xa = fullLayout && fullLayout.xaxis;
+    const ya = fullLayout && fullLayout.yaxis;
+    if (!xa || !ya || typeof xa.p2d !== "function") {
+      return; // chart not fully rendered yet - skip this gesture rather than throw
+    }
+
+    const rect = gd.getBoundingClientRect();
+    const mid = touchMidpoint(e.touches);
+    const localX = mid.x - rect.left - fullLayout._size.l;
+    const localY = mid.y - rect.top - fullLayout._size.t;
+
+    pinchState = {
+      startDistance: touchDistance(e.touches),
+      anchorDataX: xa.p2d(localX),
+      anchorDataY: ya.p2d(localY),
+      startXRange: xa.range.slice(),
+      startYRange: ya.range.slice(),
+    };
+  }
+
+  gd.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        beginPinch(e);
+      }
+    },
+    { passive: false, capture: true }
+  );
+
+  gd.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.touches.length === 2 && pinchState) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const newDistance = touchDistance(e.touches);
+        if (newDistance < 1) return;
+
+        // fingers moving apart -> zoom in (narrower range); together -> zoom out
+        const scale = pinchState.startDistance / newDistance;
+        const MIN_SCALE = 0.05; // cap how far a single gesture can zoom in
+        const MAX_SCALE = 20; // cap how far a single gesture can zoom out
+        const clampedScale = Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
+
+        const newXRange = pinchState.startXRange.map(
+          (v) => pinchState.anchorDataX + (v - pinchState.anchorDataX) * clampedScale
+        );
+        const newYRange = pinchState.startYRange.map(
+          (v) => pinchState.anchorDataY + (v - pinchState.anchorDataY) * clampedScale
+        );
+
+        Plotly.relayout(gd, {
+          "xaxis.range": newXRange,
+          "yaxis.range": newYRange,
+        });
+      }
+    },
+    { passive: false, capture: true }
+  );
+
+  function endPinch(e) {
+    if (e.touches.length < 2) {
+      pinchState = null;
+    }
+  }
+
+  gd.addEventListener("touchend", endPinch, { capture: true });
+  gd.addEventListener("touchcancel", endPinch, { capture: true });
 }
 
 function formatTimestamp(iso) {
@@ -141,10 +250,13 @@ async function refresh() {
     readoutMeta.textContent = `As of ${formatTimestamp(data.latest_timestamp)} \u00b7 fetched ${formatTimestamp(data.fetched_at)}`;
 
     const traces = buildTraces(data);
-    const plotlyConfig = { displayModeBar: false, responsive: true, scrollZoom: IS_TOUCH_DEVICE };
+    const plotlyConfig = { displayModeBar: false, responsive: true, scrollZoom: false };
     if (!chartInitialized) {
       Plotly.newPlot("chart", traces, CHART_LAYOUT, plotlyConfig);
       chartInitialized = true;
+      if (IS_TOUCH_DEVICE) {
+        setupPinchZoom(document.getElementById("chart"));
+      }
     } else {
       Plotly.react("chart", traces, CHART_LAYOUT, plotlyConfig);
     }
