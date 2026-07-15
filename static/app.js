@@ -2,8 +2,8 @@ const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
-  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
-const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
+const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
@@ -143,6 +143,20 @@ function setupPinchZoom(gd) {
     };
   }
 
+  // Plotly's axis.p2d() returns a plain number for linear axes, but a
+  // Date object for date-type axes (like our x-axis, which is
+  // timestamps). JS's +/- operators silently coerce Date objects to
+  // strings rather than numbers in this kind of arithmetic, which is
+  // what was producing garbage x-ranges. Normalize everything to a
+  // millisecond number up front so the math is safe regardless of axis
+  // type.
+  function toMillis(v) {
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === "number") return v;
+    const t = new Date(v).getTime();
+    return Number.isNaN(t) ? Number(v) : t;
+  }
+
   function beginPinch(e) {
     const fullLayout = gd._fullLayout;
     const xa = fullLayout && fullLayout.xaxis;
@@ -158,10 +172,12 @@ function setupPinchZoom(gd) {
 
     pinchState = {
       startDistance: touchDistance(e.touches),
-      anchorDataX: xa.p2d(localX),
-      anchorDataY: ya.p2d(localY),
-      startXRange: xa.range.slice(),
-      startYRange: ya.range.slice(),
+      anchorDataX: toMillis(xa.p2d(localX)),
+      anchorDataY: toMillis(ya.p2d(localY)),
+      startXRange: xa.range.map(toMillis),
+      startYRange: ya.range.map(toMillis),
+      xIsDate: xa.type === "date",
+      yIsDate: ya.type === "date",
     };
   }
 
@@ -193,12 +209,19 @@ function setupPinchZoom(gd) {
         const MAX_SCALE = 20; // cap how far a single gesture can zoom out
         const clampedScale = Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
 
-        const newXRange = pinchState.startXRange.map(
+        const newXMillis = pinchState.startXRange.map(
           (v) => pinchState.anchorDataX + (v - pinchState.anchorDataX) * clampedScale
         );
-        const newYRange = pinchState.startYRange.map(
+        const newYMillis = pinchState.startYRange.map(
           (v) => pinchState.anchorDataY + (v - pinchState.anchorDataY) * clampedScale
         );
+
+        const newXRange = pinchState.xIsDate
+          ? newXMillis.map((ms) => new Date(ms).toISOString())
+          : newXMillis;
+        const newYRange = pinchState.yIsDate
+          ? newYMillis.map((ms) => new Date(ms).toISOString())
+          : newYMillis;
 
         Plotly.relayout(gd, {
           "xaxis.range": newXRange,
