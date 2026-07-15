@@ -3,7 +3,11 @@ const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
   typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
-const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
+const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+
+// On touch devices, use pinch-to-zoom + single-finger pan instead of the
+// desktop rectangular drag-to-zoom (which is awkward with a finger).
+const IS_TOUCH_DEVICE = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 const dot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
@@ -27,6 +31,7 @@ const CHART_LAYOUT = {
     title: { text: "water level (ft)", font: { size: 11 } },
   },
   showlegend: false,
+  dragmode: IS_TOUCH_DEVICE ? "pan" : "zoom",
   shapes: [
     {
       type: "line",
@@ -136,11 +141,12 @@ async function refresh() {
     readoutMeta.textContent = `As of ${formatTimestamp(data.latest_timestamp)} \u00b7 fetched ${formatTimestamp(data.fetched_at)}`;
 
     const traces = buildTraces(data);
+    const plotlyConfig = { displayModeBar: false, responsive: true, scrollZoom: IS_TOUCH_DEVICE };
     if (!chartInitialized) {
-      Plotly.newPlot("chart", traces, CHART_LAYOUT, { displayModeBar: false, responsive: true });
+      Plotly.newPlot("chart", traces, CHART_LAYOUT, plotlyConfig);
       chartInitialized = true;
     } else {
-      Plotly.react("chart", traces, CHART_LAYOUT, { displayModeBar: false, responsive: true });
+      Plotly.react("chart", traces, CHART_LAYOUT, plotlyConfig);
     }
   } catch (err) {
     setStatus(false);
