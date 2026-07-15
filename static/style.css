@@ -146,6 +146,17 @@ body {
 #chart {
   width: 100%;
   height: 420px;
+  touch-action: none;
+}
+
+/* Plotly renders its own wrapper elements inside #chart; touch-action
+   isn't inherited, so make sure none of them fall back to the browser's
+   default multi-touch handling either (that's what was swallowing the
+   pinch gesture and leaving only single-finger pan). */
+#chart .js-plotly-plot,
+#chart .plot-container,
+#chart .svg-container {
+  touch-action: none;
 }
 
 /* --- footer --- */
