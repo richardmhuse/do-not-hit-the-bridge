@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 REFRESH_MS = int(os.environ.get("REFRESH_MS", "60000"))  # client poll interval
 BRIDGE_CLEARANCE_FT = float(os.environ.get("BRIDGE_CLEARANCE_FT", "4.81"))
-MIN_WATER_DEPTH_FT = float(os.environ.get("MIN_WATER_DEPTH_FT", "1.2"))
+MIN_WATER_DEPTH_FT = float(os.environ.get("MIN_WATER_DEPTH_FT", "1.86"))
 
 
 @app.route("/")
