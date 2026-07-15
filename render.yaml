@@ -23,6 +23,6 @@ services:
       - key: BRIDGE_CLEARANCE_FT
         value: "4.81"
       - key: MIN_WATER_DEPTH_FT
-        value: "1.2"
+        value: "1.86"
     healthCheckPath: /healthz
 
