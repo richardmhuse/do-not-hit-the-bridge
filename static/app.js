@@ -2,8 +2,8 @@ const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
-  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
-const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
+const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
@@ -83,7 +83,7 @@ const CHART_LAYOUT = {
 let chartInitialized = false;
 
 function buildTraces(data) {
-  return [
+  const traces = [
     {
       x: data.timestamps,
       y: data.raw,
@@ -101,6 +101,19 @@ function buildTraces(data) {
       hovertemplate: "%{y:.2f} ft<br>%{x}<extra></extra>",
     },
   ];
+
+  if (data.predicted_timestamps && data.predicted_timestamps.length > 1) {
+    traces.push({
+      x: data.predicted_timestamps,
+      y: data.predicted_values,
+      mode: "lines",
+      line: { color: "#9d8cff", width: 2, dash: "dot", shape: "spline" },
+      name: "predicted",
+      hovertemplate: "%{y:.2f} ft (predicted)<br>%{x}<extra></extra>",
+    });
+  }
+
+  return traces;
 }
 
 function setStatus(ok) {
