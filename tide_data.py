@@ -12,6 +12,7 @@ always reflects whatever is currently on the data repo's default branch.
 
 import io
 import logging
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -37,7 +38,7 @@ DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
 DATA_PATH = os.environ.get("DATA_PATH", "data/measured.csv")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
-LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "3"))
+LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "7"))
 
 RAW_URL = (
     f"https://raw.githubusercontent.com/"
@@ -48,6 +49,19 @@ _cache = {"timestamp": 0.0, "payload": None}
 
 TIME_COL_HINTS = ("date", "time", "timestamp")
 VALUE_COL_HINTS = ("level", "gauge", "stage", "value", "measurement", "ft", "feet", "water")
+
+# --- Gap-bridging prediction ------------------------------------------
+#
+# The data feed sometimes lags an hour or so behind real time. Rather than
+# leaving the chart looking stale, we extrapolate a short dotted segment
+# from the last actual reading forward to "now". This is a lightweight
+# single-constituent (semidiurnal) sinusoid + linear-trend fit over the
+# visible window, anchored to match the last actual reading exactly. It's
+# meant to visually bridge an hour or so of feed lag — NOT a real tidal
+# prediction model, and not intended to extrapolate far into the future.
+TIDAL_PERIOD_HOURS = 12.42  # M2 semidiurnal constituent
+PREDICTION_MAX_POINTS = 40
+MIN_POINTS_FOR_FIT = 12  # need a few hours of data before attempting a fit
 
 
 def _detect_columns(df: pd.DataFrame):
@@ -99,6 +113,60 @@ def _smooth(values: np.ndarray) -> np.ndarray:
         return pd.Series(values).rolling(window=5, center=True, min_periods=1).mean().to_numpy()
 
 
+def _predict_gap(
+    view: pd.DataFrame,
+    time_col: str,
+    smoothed_values: np.ndarray,
+    now_ts: pd.Timestamp,
+):
+    """Extrapolates from the last actual smoothed reading forward to
+    now_ts. Returns (timestamps, values) as parallel lists, both empty if
+    there's no meaningful gap to bridge or not enough data to fit."""
+    last_ts = view[time_col].iloc[-1]
+    gap_seconds = (now_ts - last_ts).total_seconds()
+
+    if gap_seconds <= 60 or len(view) < MIN_POINTS_FOR_FIT:
+        return [], []
+
+    basis = view[time_col].iloc[0]
+    t_seconds = (view[time_col] - basis).dt.total_seconds().to_numpy()
+    omega = 2 * math.pi / (TIDAL_PERIOD_HOURS * 3600)
+
+    design = np.column_stack(
+        [
+            np.sin(omega * t_seconds),
+            np.cos(omega * t_seconds),
+            np.ones_like(t_seconds),
+            t_seconds,
+        ]
+    )
+
+    try:
+        coeffs, *_ = np.linalg.lstsq(design, smoothed_values, rcond=None)
+    except Exception:
+        logger.warning("Harmonic fit failed, skipping gap prediction", exc_info=True)
+        return [], []
+
+    def fitted(t_sec):
+        a, b, c, d = coeffs
+        return a * math.sin(omega * t_sec) + b * math.cos(omega * t_sec) + c + d * t_sec
+
+    # Anchor the fit to match the last actual reading exactly, so the
+    # dotted line connects to the solid line with no visible jump.
+    t_last = (last_ts - basis).total_seconds()
+    offset = float(smoothed_values[-1]) - fitted(t_last)
+
+    n_points = max(2, min(PREDICTION_MAX_POINTS, int(gap_seconds // 60) + 2))
+    pred_timestamps = pd.date_range(start=last_ts, end=now_ts, periods=n_points)
+
+    pred_values = [fitted((ts - basis).total_seconds()) + offset for ts in pred_timestamps]
+
+    return (
+        pred_timestamps.strftime("%Y-%m-%dT%H:%M:%SZ").tolist(),
+        [float(v) for v in pred_values],
+    )
+
+
 def fetch_tide_data(force: bool = False) -> dict:
     """Returns a dict with raw + smoothed series, using a short-lived
     in-memory cache so a burst of dashboard visitors doesn't hammer
@@ -127,16 +195,26 @@ def fetch_tide_data(force: bool = False) -> dict:
     raw_values = df[value_col].to_numpy(dtype=float)
     smoothed_values = _smooth(raw_values)
 
+    now_dt = datetime.now(timezone.utc)
+    now_ts = pd.Timestamp(now_dt)
+    last_ts = df[time_col].iloc[-1]
+    gap_minutes = max(0.0, (now_ts - last_ts).total_seconds() / 60)
+
+    predicted_timestamps, predicted_values = _predict_gap(df, time_col, smoothed_values, now_ts)
+
     payload = {
         "timestamps": df[time_col].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist(),
         "raw": raw_values.tolist(),
         "smoothed": smoothed_values.tolist(),
+        "predicted_timestamps": predicted_timestamps,
+        "predicted_values": predicted_values,
+        "gap_minutes": gap_minutes,
         "value_column": value_col,
         "time_column": time_col,
         "source_url": RAW_URL,
-        "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "fetched_at": now_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "latest_value": float(smoothed_values[-1]),
-        "latest_timestamp": df[time_col].iloc[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "latest_timestamp": last_ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
     _cache["timestamp"] = now
