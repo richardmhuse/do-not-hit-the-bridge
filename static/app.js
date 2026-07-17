@@ -82,6 +82,24 @@ const CHART_LAYOUT = {
 
 let chartInitialized = false;
 
+// Plotly's date axis has no concept of timezones — it renders whatever
+// calendar values it's given, literally, with no conversion. The data
+// from the API is UTC ("...Z" timestamps), so without this the whole
+// chart (axis ticks, the predicted line, the "now" marker) renders in
+// UTC rather than the viewer's local time. This shifts each timestamp by
+// the browser's local UTC offset (DST-aware) so the *numbers* Plotly
+// sees line up with local wall-clock time, then strips the trailing "Z"
+// so nothing downstream re-interprets it as UTC again.
+function toLocalPlotTimestamp(utcIso) {
+  const d = new Date(utcIso);
+  const localMs = d.getTime() - d.getTimezoneOffset() * 60000;
+  return new Date(localMs).toISOString().slice(0, -1);
+}
+
+function toLocalPlotTimestamps(utcIsoArray) {
+  return utcIsoArray.map(toLocalPlotTimestamp);
+}
+
 function buildTraces(data) {
   const traces = [
     {
