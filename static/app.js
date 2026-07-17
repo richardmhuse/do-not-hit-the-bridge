@@ -113,6 +113,25 @@ function buildTraces(data) {
     });
   }
 
+  // Marker for "now": sits at the end of the predicted segment when the
+  // feed is lagging, or right on the last actual reading when it's fresh.
+  const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
+  const nowX = hasPrediction
+    ? data.predicted_timestamps[data.predicted_timestamps.length - 1]
+    : data.latest_timestamp;
+  const nowY = hasPrediction
+    ? data.predicted_values[data.predicted_values.length - 1]
+    : data.latest_value;
+
+  traces.push({
+    x: [nowX],
+    y: [nowY],
+    mode: "markers",
+    marker: { color: "#e8f1f5", size: 9, line: { color: "#35c6c4", width: 2 } },
+    name: "now",
+    hovertemplate: "%{y:.2f} ft \u00b7 now<br>%{x}<extra></extra>",
+  });
+
   return traces;
 }
 
