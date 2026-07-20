@@ -2,47 +2,12 @@ const REFRESH_MS = window.__REFRESH_MS__ || 60000;
 const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
-  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
-const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+  typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.2;
+const WARNING_MARGIN_FT = 1.0; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
 const IS_TOUCH_DEVICE = "ontouchstart" in window || navigator.maxTouchPoints > 0;
-
-// Plotly's date axis has no concept of timezones — it renders whatever
-// calendar values it's given, literally, with no conversion of its own.
-// The API sends true UTC ("...Z") timestamps. Without this, the whole
-// chart (axis ticks, the predicted line, the "now" marker) renders in
-// UTC rather than the viewer's own local time — which is what was
-// making the "now" marker (and everything else) look hours off.
-// Auto-detects the viewer's browser/OS timezone (DST-aware).
-const DISPLAY_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-const VIEWER_PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  timeZone: DISPLAY_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function toViewerPlotTimestamp(utcIso) {
-  const d = new Date(utcIso);
-  const parts = {};
-  for (const part of VIEWER_PARTS_FORMATTER.formatToParts(d)) {
-    parts[part.type] = part.value;
-  }
-  // hour12:false can render midnight as "24" in some engines — normalize it
-  const hour = parts.hour === "24" ? "00" : parts.hour;
-  return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}:${parts.second}`;
-}
-
-function toViewerPlotTimestamps(utcIsoArray) {
-  return utcIsoArray.map(toViewerPlotTimestamp);
-}
 
 const dot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
@@ -118,11 +83,9 @@ const CHART_LAYOUT = {
 let chartInitialized = false;
 
 function buildTraces(data) {
-  const viewerTimestamps = toViewerPlotTimestamps(data.timestamps);
-
   const traces = [
     {
-      x: viewerTimestamps,
+      x: data.timestamps,
       y: data.raw,
       mode: "markers",
       marker: { color: "rgba(124, 147, 168, 0.35)", size: 3 },
@@ -130,7 +93,7 @@ function buildTraces(data) {
       name: "raw",
     },
     {
-      x: viewerTimestamps,
+      x: data.timestamps,
       y: data.smoothed,
       mode: "lines",
       line: { color: "#35c6c4", width: 2.5, shape: "spline" },
@@ -139,11 +102,9 @@ function buildTraces(data) {
     },
   ];
 
-  const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
-
-  if (hasPrediction) {
+  if (data.predicted_timestamps && data.predicted_timestamps.length > 1) {
     traces.push({
-      x: toViewerPlotTimestamps(data.predicted_timestamps),
+      x: data.predicted_timestamps,
       y: data.predicted_values,
       mode: "lines",
       line: { color: "#9d8cff", width: 2, dash: "dot", shape: "spline" },
@@ -154,7 +115,8 @@ function buildTraces(data) {
 
   // Marker for "now": sits at the end of the predicted segment when the
   // feed is lagging, or right on the last actual reading when it's fresh.
-  const nowXRaw = hasPrediction
+  const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
+  const nowX = hasPrediction
     ? data.predicted_timestamps[data.predicted_timestamps.length - 1]
     : data.latest_timestamp;
   const nowY = hasPrediction
@@ -162,7 +124,7 @@ function buildTraces(data) {
     : data.latest_value;
 
   traces.push({
-    x: [toViewerPlotTimestamp(nowXRaw)],
+    x: [nowX],
     y: [nowY],
     mode: "markers",
     marker: { color: "#e8f1f5", size: 9, line: { color: "#35c6c4", width: 2 } },
@@ -314,8 +276,7 @@ function setupPinchZoom(gd) {
 
 function formatTimestamp(iso) {
   const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    timeZone: DISPLAY_TIME_ZONE,
+  return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
