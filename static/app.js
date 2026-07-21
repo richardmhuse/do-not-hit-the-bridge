@@ -152,7 +152,7 @@ function buildTraces(data) {
       x: toViewerPlotTimestamps(data.predicted_timestamps),
       y: data.predicted_values,
       mode: "lines",
-      line: { color: "#9d8cff", width: 2, dash: "dot", shape: "spline" },
+      line: { color: "#35c6c4", width: 2, dash: "dot", shape: "spline" },
       name: "predicted",
       hovertemplate: "%{y:.2f} ft (predicted)<br>%{x}<extra></extra>",
     });
