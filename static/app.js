@@ -18,6 +18,10 @@ const IS_TOUCH_DEVICE = "ontouchstart" in window || navigator.maxTouchPoints > 0
 // Auto-detects the viewer's browser/OS timezone (DST-aware).
 const DISPLAY_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+const INITIAL_VIEW_DAYS =
+  typeof window.__INITIAL_VIEW_DAYS__ === "number" ? window.__INITIAL_VIEW_DAYS__ : 1.5;
+const INITIAL_VIEW_END_PADDING_HOURS = 3; // breathing room past "now" so the marker isn't flush against the edge;
+
 const VIEWER_PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: DISPLAY_TIME_ZONE,
   year: "numeric",
