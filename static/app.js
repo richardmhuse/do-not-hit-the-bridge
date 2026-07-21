@@ -154,7 +154,7 @@ const CHART_LAYOUT = {
             y1: BRIDGE_CLEARANCE_FT,
 
             line: {
-                color: "#FFB340",
+                color: "rgba(255,179,64,.82)",
                 width: 2.5
             }
         },
@@ -173,7 +173,7 @@ const CHART_LAYOUT = {
             y1: MIN_WATER_DEPTH_FT,
 
             line: {
-                color: "#FF6961",
+                color: "rgba(255,105,97,.82)",
                 width: 2.5
             }
         }
