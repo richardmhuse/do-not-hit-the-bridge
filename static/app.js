@@ -401,18 +401,8 @@ async function refresh() {
 
     const plotlyConfig = { displayModeBar: false, responsive: true, scrollZoom: false };
     if (!chartInitialized) {
-  const initialLayout = {
-    ...CHART_LAYOUT,
-    xaxis: { ...CHART_LAYOUT.xaxis, range: computeInitialXRange(data) },
-  };
-  Plotly.newPlot("chart", traces, initialLayout, plotlyConfig);
-  chartInitialized = true;
-  if (IS_TOUCH_DEVICE) {
-    setupPinchZoom(document.getElementById("chart"));
-  }
-} else {
-  Plotly.react("chart", traces, CHART_LAYOUT, plotlyConfig);
-};
+      Plotly.newPlot("chart", traces, CHART_LAYOUT, plotlyConfig);
+      chartInitialized = true;
       if (IS_TOUCH_DEVICE) {
         setupPinchZoom(document.getElementById("chart"));
       }
