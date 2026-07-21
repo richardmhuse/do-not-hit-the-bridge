@@ -267,18 +267,27 @@ function buildTraces(data) {
       name: "raw",
     },
     {
-      x: viewerTimestamps,
-      y: data.smoothed,
-      mode: "lines",
-      line: {
-    color: "#0A84FF",
-    width: 4.5,
-    shape: "spline",
-    smoothing: 0.5
-},
-      name: "smoothed",
-      hovertemplate: "%{y:.2f} ft<br>%{x}<extra></extra>",
+    x: viewerTimestamps,
+    y: data.smoothed,
+
+    mode: "lines",
+
+    line: {
+        color: "#0A84FF",
+        width: 4,
+        shape: "spline",
+        smoothing: 0.65
     },
+
+    fill: "tozeroy",
+
+    fillcolor: "rgba(10,132,255,.14)",
+
+    name: "Water Level",
+
+    hovertemplate:
+        "<b>%{y:.2f} ft</b><br>%{x|%b %d, %I:%M %p}<extra></extra>"
+},
   ];
 
   const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
