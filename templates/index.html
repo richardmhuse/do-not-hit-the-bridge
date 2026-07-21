@@ -41,7 +41,8 @@
     window.__REFRESH_MS__ = {{ refresh_ms }};
     window.__BRIDGE_CLEARANCE_FT__ = {{ bridge_clearance_ft }};
     window.__MIN_WATER_DEPTH_FT__ = {{ min_water_depth_ft }};
-  </script>
+    window.__INITIAL_VIEW_DAYS__ = {{ initial_view_days }};
+</script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
