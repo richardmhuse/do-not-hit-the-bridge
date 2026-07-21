@@ -55,70 +55,192 @@ const readoutMeta = document.getElementById("readout-meta");
 const errorBanner = document.getElementById("error-banner");
 
 const CHART_LAYOUT = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor: "transparent",
-  margin: { l: 48, r: 20, t: 16, b: 40 },
-  font: { family: "IBM Plex Sans, sans-serif", color: "#7c93a8", size: 12 },
-  xaxis: {
-    gridcolor: "rgba(124, 147, 168, 0.15)",
-    zeroline: false,
-    tickformat: "%b %d\n%H:%M",
-  },
-  yaxis: {
-    gridcolor: "rgba(124, 147, 168, 0.15)",
-    zeroline: false,
-    title: { text: "water level (ft)", font: { size: 11 } },
-  },
-  showlegend: false,
-  dragmode: IS_TOUCH_DEVICE ? "pan" : "zoom",
-  shapes: [
-    {
-      type: "line",
-      xref: "paper",
-      x0: 0,
-      x1: 1,
-      yref: "y",
-      y0: BRIDGE_CLEARANCE_FT,
-      y1: BRIDGE_CLEARANCE_FT,
-      line: { color: "#f2a93c", width: 1.5, dash: "dash" },
-    },
-    {
-      type: "line",
-      xref: "paper",
-      x0: 0,
-      x1: 1,
-      yref: "y",
-      y0: MIN_WATER_DEPTH_FT,
-      y1: MIN_WATER_DEPTH_FT,
-      line: { color: "#ef6461", width: 1.5, dash: "dash" },
-    },
-  ],
-  annotations: [
-    {
-      xref: "paper",
-      x: 1,
-      xanchor: "right",
-      yref: "y",
-      y: BRIDGE_CLEARANCE_FT,
-      yshift: 10,
-      text: `bridge clearance \u00b7 ${BRIDGE_CLEARANCE_FT.toFixed(2)} ft`,
-      showarrow: false,
-      font: { color: "#f2a93c", size: 11, family: "JetBrains Mono, monospace" },
-    },
-    {
-      xref: "paper",
-      x: 1,
-      xanchor: "right",
-      yref: "y",
-      y: MIN_WATER_DEPTH_FT,
-      yshift: -10,
-      text: `min depth \u00b7 ${MIN_WATER_DEPTH_FT.toFixed(2)} ft`,
-      showarrow: false,
-      font: { color: "#ef6461", size: 11, family: "JetBrains Mono, monospace" },
-    },
-  ],
-};
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
 
+    margin: {
+        l: 58,
+        r: 30,
+        t: 28,
+        b: 54
+    },
+
+    font: {
+        family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif',
+        size: 13,
+        color: '#1d1d1f'
+    },
+
+    showlegend: false,
+
+    hovermode: 'x unified',
+
+    hoverlabel: {
+        bgcolor: 'rgba(255,255,255,0.94)',
+        bordercolor: 'rgba(0,0,0,.08)',
+        font: {
+            family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+            size: 13,
+            color: '#1d1d1f'
+        }
+    },
+
+    dragmode: IS_TOUCH_DEVICE ? 'pan' : 'zoom',
+
+    xaxis: {
+        tickformat: "%b %-d\n%I %p",
+
+        showgrid: true,
+        gridcolor: "rgba(0,0,0,.045)",
+        gridwidth: 1,
+
+        zeroline: false,
+        showline: false,
+
+        ticks: "",
+        ticklen: 0,
+
+        tickfont: {
+            size: 12,
+            color: "#86868b"
+        },
+
+        showspikes: true,
+        spikecolor: "rgba(0,122,255,.35)",
+        spikemode: "across",
+        spikethickness: 1,
+        spikedash: "solid"
+    },
+
+    yaxis: {
+
+        title: {
+            text: "Water Level (ft)",
+            font: {
+                size: 13,
+                color: "#6e6e73"
+            }
+        },
+
+        showgrid: true,
+        gridcolor: "rgba(0,0,0,.045)",
+        gridwidth: 1,
+
+        zeroline: false,
+        showline: false,
+
+        ticks: "",
+        ticklen: 0,
+
+        tickfont: {
+            size: 12,
+            color: "#86868b"
+        }
+    },
+
+    shapes: [
+
+        // Bridge clearance
+
+        {
+            type: "line",
+
+            xref: "paper",
+            x0: 0,
+            x1: 1,
+
+            yref: "y",
+            y0: BRIDGE_CLEARANCE_FT,
+            y1: BRIDGE_CLEARANCE_FT,
+
+            line: {
+                color: "rgba(255,159,10,.85)",
+                width: 2
+            }
+        },
+
+        // Minimum depth
+
+        {
+            type: "line",
+
+            xref: "paper",
+            x0: 0,
+            x1: 1,
+
+            yref: "y",
+            y0: MIN_WATER_DEPTH_FT,
+            y1: MIN_WATER_DEPTH_FT,
+
+            line: {
+                color: "rgba(255,69,58,.85)",
+                width: 2
+            }
+        }
+
+    ],
+
+    annotations: [
+
+        {
+            xref: "paper",
+            x: 1,
+            xanchor: "right",
+
+            yref: "y",
+            y: BRIDGE_CLEARANCE_FT,
+
+            yshift: 14,
+
+            showarrow: false,
+
+            align: "right",
+
+            text:
+                "<b>Bridge Clearance</b><br>" +
+                BRIDGE_CLEARANCE_FT.toFixed(2) +
+                " ft",
+
+            font: {
+                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+                size: 12,
+                color: "#FF9F0A"
+            }
+        },
+
+        {
+            xref: "paper",
+            x: 1,
+            xanchor: "right",
+
+            yref: "y",
+            y: MIN_WATER_DEPTH_FT,
+
+            yshift: -14,
+
+            showarrow: false,
+
+            align: "right",
+
+            text:
+                "<b>Minimum Depth</b><br>" +
+                MIN_WATER_DEPTH_FT.toFixed(2) +
+                " ft",
+
+            font: {
+                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+                size: 12,
+                color: "#FF453A"
+            }
+        }
+
+    ],
+
+    transition: {
+        duration: 500,
+        easing: "cubic-in-out"
+    }
+};
 let chartInitialized = false;
 let lastPayload = null;
 let nowTraceIndex = null;
