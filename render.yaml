@@ -16,8 +16,10 @@ services:
         value: data/measured.csv
       - key: CACHE_TTL_SECONDS
         value: "300"
-      - key: LOOKBACK_DAYS
-        value: "3"
+      - key: HISTORY_DAYS
+        value: "30"
+      - key: INITIAL_VIEW_DAYS
+        value: "1.5"
       - key: REFRESH_MS
         value: "60000"
       - key: BRIDGE_CLEARANCE_FT
