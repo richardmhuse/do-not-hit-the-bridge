@@ -13,7 +13,7 @@ app = Flask(__name__)
 REFRESH_MS = int(os.environ.get("REFRESH_MS", "60000"))  # client poll interval
 BRIDGE_CLEARANCE_FT = float(os.environ.get("BRIDGE_CLEARANCE_FT", "4.81"))
 MIN_WATER_DEPTH_FT = float(os.environ.get("MIN_WATER_DEPTH_FT", "1.86"))
-
+INITIAL_VIEW_DAYS = float(os.environ.get("INITIAL_VIEW_DAYS", "1.5"))
 
 @app.route("/")
 def index():
@@ -23,6 +23,7 @@ def index():
         refresh_ms=REFRESH_MS,
         bridge_clearance_ft=BRIDGE_CLEARANCE_FT,
         min_water_depth_ft=MIN_WATER_DEPTH_FT,
+        initial_view_days=INITIAL_VIEW_DAYS,
     )
 
 
