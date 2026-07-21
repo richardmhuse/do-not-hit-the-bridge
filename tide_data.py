@@ -207,7 +207,7 @@ def fetch_tide_data(force: bool = False) -> dict:
     df = df.sort_values(time_col).drop_duplicates(subset=[time_col])
 
     if not df.empty:
-        cutoff = df[time_col].max() - pd.Timedelta(days=LOOKBACK_DAYS)
+        cutoff = df[time_col].max() - pd.Timedelta(days=HISTORY_DAYS)
         df = df[df[time_col] >= cutoff]
 
     if df.empty:
