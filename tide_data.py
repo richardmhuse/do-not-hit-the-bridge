@@ -38,7 +38,7 @@ DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
 DATA_PATH = os.environ.get("DATA_PATH", "data/measured.csv")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
-LOOKBACK_DAYS = float(os.environ.get("LOOKBACK_DAYS", "7"))
+HISTORY_DAYS = float(os.environ.get("HISTORY_DAYS", "30"))
 
 # The gauge feed's timestamps appear to actually be Eastern local time
 # (not true UTC) — evidence: once the frontend started doing a genuine
