@@ -123,6 +123,15 @@ let chartInitialized = false;
 let lastPayload = null;
 let nowTraceIndex = null;
 
+function computeInitialXRange(data) {
+  const lastMs = Math.max(new Date(data.latest_timestamp).getTime(), Date.now());
+  const endMs = lastMs + INITIAL_VIEW_END_PADDING_HOURS * 3600000;
+  const startMs = endMs - INITIAL_VIEW_DAYS * 24 * 3600000;
+  return [
+    toViewerPlotTimestamp(new Date(startMs).toISOString()),
+    toViewerPlotTimestamp(new Date(endMs).toISOString()),
+  ];
+};
 function buildTraces(data) {
   const viewerTimestamps = toViewerPlotTimestamps(data.timestamps);
 
