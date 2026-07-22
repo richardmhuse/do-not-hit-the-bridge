@@ -299,8 +299,8 @@ showlegend: false,
 
   if (hasPrediction) {
     traces.push({
-      x: toViewerPlotTimestamps(data.predicted_timestamps),
-      y: data.predicted_values,
+      x: toViewerPlotTimestamps(data.predicted_timestamps).slice(1),
+y: data.predicted_values.slice(1),
       mode: "lines",
       line: {
     color: "#0A84FF",
