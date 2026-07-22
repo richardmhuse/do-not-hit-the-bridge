@@ -91,7 +91,7 @@ const CHART_LAYOUT = {
         tickformat: "%b %-d\n%I %p",
 
         showgrid: true,
-        gridcolor: "rgba(0,0,0,.045)",
+        gridcolor: "rgba(0,0,0,.03)",
         gridwidth: 1,
 
         zeroline: false,
