@@ -204,7 +204,9 @@ const CHART_LAYOUT = {
             font: {
                 family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
                 size: 12,
-                color:"#C97A00"
+                color:"#C97A00",
+              bgcolor:"rgba(255,255,255,.75)",
+borderpad:4,
             }
         },
 
