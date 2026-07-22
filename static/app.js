@@ -585,7 +585,23 @@ async function refresh() {
     setupPinchZoom(document.getElementById("chart"));
   }
 } else {
-  Plotly.react("chart", traces, CHART_LAYOUT, plotlyConfig);
+  const gd = document.getElementById("chart");
+
+const layout = {
+  ...CHART_LAYOUT,
+  xaxis: {
+    ...CHART_LAYOUT.xaxis
+  }
+};
+
+// Preserve whatever view the user is currently looking at
+if (gd.layout?.xaxis?.range) {
+  layout.xaxis.range = [...gd.layout.xaxis.range];
+} else {
+  layout.xaxis.range = computeInitialXRange(data);
+}
+
+Plotly.react(gd, traces, layout, plotlyConfig);
 }
   } catch (err) {
     setStatus(false);
