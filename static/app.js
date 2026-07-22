@@ -155,7 +155,7 @@ const CHART_LAYOUT = {
 
             line: {
                 color: "rgba(255,179,64,.82)",
-                width: 2.5
+                width: 1.8
             }
         },
 
@@ -174,7 +174,7 @@ const CHART_LAYOUT = {
 
             line: {
                 color: "rgba(255,105,97,.82)",
-                width: 2.5
+                width: 1.8
             }
         }
 
