@@ -268,6 +268,7 @@ function buildTraces(data) {
       mode: "markers",
       marker: { color: "rgba(124, 147, 168, 0.35)", size: 3 },
       hoverinfo: "skip",
+showlegend: false,
       name: "raw",
     },
     {
