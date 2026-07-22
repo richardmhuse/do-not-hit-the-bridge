@@ -290,8 +290,8 @@ showlegend: false,
 
     name: "Water Level",
 
-    hovertemplate:
-        "<b>%{y:.2f} ft</b><br>%{x|%b %d, %I:%M %p}<extra></extra>"
+    hoverinfo: "skip",
+showlegend: false,
 },
   ];
 
