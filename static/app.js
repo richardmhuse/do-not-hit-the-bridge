@@ -347,8 +347,8 @@ textfont:{
         width:3
     }
 },
-    name: "now",
-    hovertemplate: "%{y:.2f} ft \u00b7 now<br>%{x}<extra></extra>",
+    hoverinfo: "skip",
+showlegend: false,
   });
 
   return traces;
