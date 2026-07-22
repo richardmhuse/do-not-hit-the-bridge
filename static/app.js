@@ -232,7 +232,9 @@ borderpad:4,
             font: {
                 family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
                 size: 12,
-                color:"#D94B43"
+                color:"#D94B43",
+              bgcolor:"rgba(255,255,255,.75)",
+borderpad:4,
             }
         }
 
