@@ -317,7 +317,17 @@ opacity: .55,
   traces.push({
     x: [toViewerPlotTimestamp(seed.utcIso)],
     y: [seed.value],
-    mode: "markers",
+    mode:"markers+text",
+
+text:["Now"],
+
+textposition:"top center",
+
+textfont:{
+    family:'-apple-system',
+    size:11,
+    color:"#0A84FF"
+},
     marker:{
     size:13,
 
