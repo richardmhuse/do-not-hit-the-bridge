@@ -318,7 +318,16 @@ opacity: .55,
     x: [toViewerPlotTimestamp(seed.utcIso)],
     y: [seed.value],
     mode: "markers",
-    marker: { color: "#e8f1f5", size: 9, line: { color: "#35c6c4", width: 2 } },
+    marker:{
+    size:13,
+
+    color:"#FFFFFF",
+
+    line:{
+        color:"#0A84FF",
+        width:3
+    }
+},
     name: "now",
     hovertemplate: "%{y:.2f} ft \u00b7 now<br>%{x}<extra></extra>",
   });
