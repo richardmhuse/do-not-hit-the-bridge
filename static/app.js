@@ -311,7 +311,11 @@ y: data.predicted_values.slice(1),
 
 opacity: .55,
       name: "predicted",
-      hovertemplate: "%{y:.2f} ft (predicted)<br>%{x}<extra></extra>",
+      hovertemplate:
+"<b>%{y:.2f} ft</b><br>" +
+"Predicted<br>" +
+"%{x|%b %d, %I:%M %p}" +
+"<extra></extra>",
     });
   }
 
