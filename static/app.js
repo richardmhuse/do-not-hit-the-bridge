@@ -267,8 +267,11 @@ function buildTraces(data) {
       y: data.raw,
       mode: "markers",
       marker: { color: "rgba(124, 147, 168, 0.35)", size: 3 },
-      hoverinfo: "skip",
-showlegend: false,
+      hovertemplate:
+"<b>%{y:.2f} ft</b><br>" +
+"Measured<br>" +
+"%{x|%b %d, %I:%M %p}" +
+"<extra></extra>",
       name: "raw",
     },
     {
