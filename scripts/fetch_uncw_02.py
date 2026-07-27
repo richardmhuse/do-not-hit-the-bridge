@@ -20,7 +20,7 @@ import pandas as pd
 from pathlib import Path
 
 # ---- Config ----------------------------------------------------------
-STATION_ID = "UNCW-02"
+STATION_ID = "WSC-MASE-WL"
 API_URL = f"https://fiman.nc.gov/api/gauges/{STATION_ID}"
 OUTPUT_PATH = Path("data/measured.csv")
 
