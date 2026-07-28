@@ -1,11 +1,11 @@
 """
-Combine tides, weather, rain, lunar (if present) and measured sensor data
-into a single time-aligned dataset for modeling.
+Combine all sources onto the measured gauge timeline (highest frequency).
 """
 import pandas as pd
 from pathlib import Path
 
 from config import DATA_RAW, DATA_PROCESSED
+
 
 def load_csv(path: Path, time_col: str = "t") -> pd.DataFrame | None:
     if not path.exists():
@@ -21,50 +21,58 @@ def load_csv(path: Path, time_col: str = "t") -> pd.DataFrame | None:
 
 def main():
     print("Loading raw datasets...")
+
+    # --- measured (long → wide) ---
+    measured_path = DATA_RAW / "measured.csv"
+    if not measured_path.exists():
+        raise FileNotFoundError(f"{measured_path} is required")
+
+    raw = pd.read_csv(measured_path, parse_dates=["timestamp"])
+    raw = raw.rename(columns={"timestamp": "t"})
+    if raw["t"].dt.tz is None:
+        # gauge timestamps are Eastern local time
+        raw["t"] = (
+            pd.to_datetime(raw["t"])
+            .dt.tz_localize("America/New_York", ambiguous="NaT", nonexistent="NaT")
+            .dt.tz_convert("UTC")
+        )
+    else:
+        raw["t"] = raw["t"].dt.tz_convert("UTC")
+
+    measured = (
+        raw.dropna(subset=["t"])
+        .pivot_table(index="t", columns="parameter", values="value", aggfunc="mean")
+        .add_prefix("measured_")
+        .sort_index()
+    )
+    print(f"  measured: {len(measured)} rows, columns = {list(measured.columns)}")
+
     tides   = load_csv(DATA_RAW / "tides.csv")
     weather = load_csv(DATA_RAW / "weather.csv")
     rain    = load_csv(DATA_RAW / "rain.csv")
-    lunar   = load_csv(DATA_RAW / "lunar.csv")          # optional
+    lunar   = load_csv(DATA_RAW / "lunar.csv")
 
-    # measured.csv is long-format: timestamp, value, parameter, ...
-    measured_path = DATA_RAW / "measured.csv"
-    measured = None
-    if measured_path.exists():
-        raw = pd.read_csv(measured_path, parse_dates=["timestamp"])
-        raw = raw.rename(columns={"timestamp": "t"})
-        if raw["t"].dt.tz is None:
-            raw["t"] = pd.to_datetime(raw["t"], utc=True)
-        measured = (
-            raw.pivot_table(index="t", columns="parameter", values="value", aggfunc="mean")
-            .add_prefix("measured_")
-            .sort_index()
-        )
-        print(f"  measured: {len(measured)} rows, columns = {list(measured.columns)}")
-    else:
-        print("  ⚠ measured.csv missing")
+    # Start from the dense measured series
+    combined = measured.copy()
 
-    # Start with tides as the backbone (regular hourly grid)
-    if tides is None:
-        raise FileNotFoundError("tides.csv is required as the time backbone")
-
-    combined = tides.copy()
-
-    for name, df in [("weather", weather), ("rain", rain), ("lunar", lunar)]:
-        if df is not None:
-            combined = combined.join(df, how="left")
-            print(f"  joined {name}")
-
-    # Nearest-neighbor join for measured (sensor may not be on exact hour)
-    if measured is not None:
-        combined = pd.merge_asof(
-            combined.sort_index(),
-            measured.sort_index(),
+    def asof_join(left: pd.DataFrame, right: pd.DataFrame | None, name: str, tol="45min"):
+        if right is None:
+            return left
+        out = pd.merge_asof(
+            left.sort_index(),
+            right.sort_index(),
             left_index=True,
             right_index=True,
             direction="nearest",
-            tolerance=pd.Timedelta("30min"),
+            tolerance=pd.Timedelta(tol),
         )
-        print("  joined measured (asof 30 min)")
+        print(f"  joined {name}")
+        return out
+
+    combined = asof_join(combined, tides,   "tides")
+    combined = asof_join(combined, weather, "weather")
+    combined = asof_join(combined, rain,    "rain")
+    combined = asof_join(combined, lunar,   "lunar", tol="2h")
 
     # Clean-ups
     if "rain_inches" in combined.columns:
@@ -74,8 +82,9 @@ def main():
         combined["rain_7d"]  = combined["rain_inches"].rolling("7d",  min_periods=1).sum()
 
     if lunar is not None:
-        lunar_cols = [c for c in lunar.columns if c in combined.columns]
-        combined[lunar_cols] = combined[lunar_cols].ffill()
+        for c in ("illumination", "phase_angle"):
+            if c in combined.columns:
+                combined[c] = combined[c].ffill()
 
     DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
     out = DATA_PROCESSED / "combined.csv"
