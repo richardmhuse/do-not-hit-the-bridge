@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-REFRESH_MS = int(os.environ.get("REFRESH_MS", "60000"))  # client poll interval
+REFRESH_MS = int(os.environ.get("REFRESH_MS", "60000"))
 BRIDGE_CLEARANCE_FT = float(os.environ.get("BRIDGE_CLEARANCE_FT", "4.81"))
 MIN_WATER_DEPTH_FT = float(os.environ.get("MIN_WATER_DEPTH_FT", "1.86"))
 INITIAL_VIEW_DAYS = float(os.environ.get("INITIAL_VIEW_DAYS", "1.5"))
+
 
 @app.route("/")
 def index():
