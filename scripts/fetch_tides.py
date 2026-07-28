@@ -37,8 +37,9 @@ def fetch_tides(station_id: str, begin_date: str, end_date: str) -> pd.DataFrame
 def main():
     today = date.today()
     # Pull a little extra history so the series is continuous
-    start = today - timedelta(days=2)
-    end = today + timedelta(days=1)
+    today = date.today()
+    start = today - timedelta(days=30)
+    end   = today + timedelta(days=2)
 
     print(f"Fetching tides for station {TIDE_STATION_ID} ({start} → {end})...")
     new_data = fetch_tides(
