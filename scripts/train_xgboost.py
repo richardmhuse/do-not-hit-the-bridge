@@ -83,11 +83,11 @@ def prepare_xy(df: pd.DataFrame, target: str):
 
     # Final safety
     still_bad = X.isna().any(axis=1) | y.isna()
-    if still_bad.any():
-        X = X.loc[~still_bad]
-        y = y.loc[~still_bad]
+        if still_bad.any():
+            X = X.loc[~still_bad]
+            y = y.loc[~still_bad]
 
-    return X, y, feature_cols
+        return X, y, feature_cols
 
 
 def main(
