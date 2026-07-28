@@ -22,7 +22,7 @@ from pathlib import Path
 # ---- Config ----------------------------------------------------------
 STATION_ID = "WSC-MASE-WL"
 API_URL = f"https://fiman.nc.gov/api/gauges/{STATION_ID}"
-OUTPUT_PATH = Path("data/measured.csv")
+OUTPUT_PATH = Path("data/raw/measured.csv")
 
 # Map known parameter codes to human-readable names (extend as needed)
 PARAMETER_CODES = {
