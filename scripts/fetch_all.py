@@ -16,6 +16,8 @@ SCRIPTS = [
     "scripts/fetch_uncw_02.py",
     "scripts/combine_data.py",
     "scripts/build_features.py",
+    "scripts/train_xgboost.py",      
+    "scripts/generate_forecast.py",
 ]
 
 
