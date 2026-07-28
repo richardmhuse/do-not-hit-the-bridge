@@ -96,16 +96,16 @@ def main(
     max_depth: int = 6,
     learning_rate: float = 0.05,
 ):
-    if not FEATURES_PATH.exists():
-        raise FileNotFoundError(
-            f"{FEATURES_PATH} not found – run build_features.py first"
-        )
+        # Ensure residual exists and is clean
+    if "tide_ft" not in df.columns:
+        raise ValueError("tide_ft missing – cannot train residual model")
+    if "measured_gauge_height_ft" not in df.columns:
+        # adjust name if your column is different
+        raise ValueError("measured_gauge_height_ft missing")
 
-    print("Loading features…")
-    df = pd.read_csv(FEATURES_PATH, index_col=0, parse_dates=True)
-    if df.index.tz is None:
-        df.index = pd.to_datetime(df.index, utc=True)
-    df = df.sort_index()
+    df["tide_residual"] = df["measured_gauge_height_ft"] - df["tide_ft"]
+    # drop rows where we couldn't form a residual
+    df = df.dropna(subset=["tide_residual", "tide_ft"])
 
     target = find_target(df)
     print(f"Target: {target}")
