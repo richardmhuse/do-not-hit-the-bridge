@@ -152,7 +152,7 @@ def main(
 
     pred_test = model.predict(X_test)
     mae = mean_absolute_error(y_test, pred_test)
-    rmse = mean_squared_error(y_test, pred_test, squared=False)
+    rmse = float(np.sqrt(mean_squared_error(y_test, pred_test)))
     print(f"\nHold-out performance")
     print(f"  MAE  : {mae:.4f} ft")
     print(f"  RMSE : {rmse:.4f} ft")
