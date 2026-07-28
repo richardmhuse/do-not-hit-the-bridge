@@ -1,21 +1,27 @@
 """
 tide_data.py
 
-Fetches the live measured-gauge CSV from the NOAA-Data-Pipeline-V2 repo
-(raw.githubusercontent.com) and produces a smoothed series suitable for
-plotting a real-time tidal / bridge-clearance chart.
+Loads measured gauge data and (when available) the XGBoost forecast,
+then returns the payload the dashboard expects.
 
-No GitHub Action is involved on purpose: the web app fetches the CSV
-directly at request time (with a short in-memory cache) so the dashboard
-always reflects whatever is currently on the data repo's default branch.
+Priority for measured data:
+  1. Local file  data/raw/measured.csv   (written by the pipeline / Cron)
+  2. Public GitHub raw URL               (fallback so the site stays up)
+
+Priority for the prediction line:
+  1. data/processed/forecast.json        (XGBoost multi-step forecast)
+  2. Lightweight harmonic gap-bridge     (original behaviour, only fills
+                                          lag between last reading and now)
 """
 
 import io
+import json
 import logging
 import math
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -24,15 +30,9 @@ from scipy.signal import savgol_filter
 
 logger = logging.getLogger(__name__)
 
-# --- Configuration (override via environment variables on Render) ---------
-#
-# This reads from the PUBLIC mirror repo (do-not-hit-the-bridge), not the
-# private NOAA-Data-Pipeline-V2 repo directly. A separate scheduled Action
-# in do-not-hit-the-bridge copies measured.csv over from the private repo
-# (see mirror-workflow/ alongside this app). That keeps this web app
-# anonymous and token-free — it only ever talks to a public
-# raw.githubusercontent.com URL.
-
+# ---------------------------------------------------------------------------
+# Configuration (override via environment variables on Render)
+# ---------------------------------------------------------------------------
 GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "richardmhuse")
 DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
@@ -40,18 +40,11 @@ DATA_PATH = os.environ.get("DATA_PATH", "data/measured.csv")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
 HISTORY_DAYS = float(os.environ.get("HISTORY_DAYS", "30"))
 
-# The gauge feed's timestamps appear to actually be Eastern local time
-# (not true UTC) — evidence: once the frontend started doing a genuine
-# UTC-to-viewer-timezone conversion, the "now" marker (computed fresh
-# server-side from real UTC) landed correctly, but the actual readings —
-# which were previously just displayed as literal digits with no
-# conversion — shifted to the wrong time. That only happens if the raw
-# timestamps were never true UTC to begin with. This localizes them as
-# SOURCE_DATA_TIMEZONE (DST-aware) and converts to real UTC before
-# anything else touches them. If this assumption turns out to be wrong,
-# override it via env var — e.g. SOURCE_DATA_TIMEZONE=UTC restores the
-# original (pre-fix) behavior.
 SOURCE_DATA_TIMEZONE = os.environ.get("SOURCE_DATA_TIMEZONE", "America/New_York")
+
+# Local paths used by the new pipeline
+LOCAL_MEASURED_PATH = Path(os.environ.get("LOCAL_MEASURED_PATH", "data/raw/measured.csv"))
+LOCAL_FORECAST_PATH = Path(os.environ.get("LOCAL_FORECAST_PATH", "data/processed/forecast.json"))
 
 RAW_URL = (
     f"https://raw.githubusercontent.com/"
@@ -63,23 +56,13 @@ _cache = {"timestamp": 0.0, "payload": None}
 TIME_COL_HINTS = ("date", "time", "timestamp")
 VALUE_COL_HINTS = ("level", "gauge", "stage", "value", "measurement", "ft", "feet", "water")
 
-# --- Gap-bridging prediction ------------------------------------------
-#
-# The data feed sometimes lags an hour or so behind real time. Rather than
-# leaving the chart looking stale, we extrapolate a short dotted segment
-# from the last actual reading forward to "now". This is a lightweight
-# single-constituent (semidiurnal) sinusoid + linear-trend fit over the
-# visible window, anchored to match the last actual reading exactly. It's
-# meant to visually bridge an hour or so of feed lag — NOT a real tidal
-# prediction model, and not intended to extrapolate far into the future.
-TIDAL_PERIOD_HOURS = 12.42  # M2 semidiurnal constituent
+# --- Gap-bridging prediction (fallback only) --------------------------------
+TIDAL_PERIOD_HOURS = 12.42
 PREDICTION_MAX_POINTS = 40
-MIN_POINTS_FOR_FIT = 12  # need a few hours of data before attempting a fit
+MIN_POINTS_FOR_FIT = 12
 
 
 def _detect_columns(df: pd.DataFrame):
-    """Best-effort detection of the timestamp and water-level columns,
-    since the exact header names in measured.csv may evolve upstream."""
     time_col = None
     for col in df.columns:
         if any(hint in col.lower() for hint in TIME_COL_HINTS):
@@ -106,9 +89,6 @@ def _detect_columns(df: pd.DataFrame):
 
 
 def _smooth(values: np.ndarray) -> np.ndarray:
-    """Savitzky-Golay smoothing: preserves the shape of the tidal curve
-    while denoising individual gauge readings. Falls back to a rolling
-    mean for very short series."""
     n = len(values)
     if n < 5:
         return values
@@ -126,15 +106,8 @@ def _smooth(values: np.ndarray) -> np.ndarray:
         return pd.Series(values).rolling(window=5, center=True, min_periods=1).mean().to_numpy()
 
 
-def _predict_gap(
-    view: pd.DataFrame,
-    time_col: str,
-    smoothed_values: np.ndarray,
-    now_ts: pd.Timestamp,
-):
-    """Extrapolates from the last actual smoothed reading forward to
-    now_ts. Returns (timestamps, values) as parallel lists, both empty if
-    there's no meaningful gap to bridge or not enough data to fit."""
+def _predict_gap(view, time_col, smoothed_values, now_ts):
+    """Original short harmonic bridge – only used when no ML forecast exists."""
     last_ts = view[time_col].iloc[-1]
     gap_seconds = (now_ts - last_ts).total_seconds()
 
@@ -164,14 +137,11 @@ def _predict_gap(
         a, b, c, d = coeffs
         return a * math.sin(omega * t_sec) + b * math.cos(omega * t_sec) + c + d * t_sec
 
-    # Anchor the fit to match the last actual reading exactly, so the
-    # dotted line connects to the solid line with no visible jump.
     t_last = (last_ts - basis).total_seconds()
     offset = float(smoothed_values[-1]) - fitted(t_last)
 
     n_points = max(2, min(PREDICTION_MAX_POINTS, int(gap_seconds // 60) + 2))
     pred_timestamps = pd.date_range(start=last_ts, end=now_ts, periods=n_points)
-
     pred_values = [fitted((ts - basis).total_seconds()) + offset for ts in pred_timestamps]
 
     return (
@@ -180,25 +150,45 @@ def _predict_gap(
     )
 
 
+def _load_measured_csv() -> pd.DataFrame:
+    """Prefer local pipeline file; fall back to public GitHub raw URL."""
+    if LOCAL_MEASURED_PATH.exists():
+        logger.info("Loading measured data from local file: %s", LOCAL_MEASURED_PATH)
+        df = pd.read_csv(LOCAL_MEASURED_PATH)
+        return df
+
+    logger.info("Local measured.csv not found – fetching from GitHub: %s", RAW_URL)
+    resp = requests.get(RAW_URL, timeout=20)
+    resp.raise_for_status()
+    return pd.read_csv(io.StringIO(resp.text))
+
+
+def _load_ml_forecast() -> dict | None:
+    """Return the XGBoost forecast payload if present and fresh enough."""
+    if not LOCAL_FORECAST_PATH.exists():
+        return None
+    try:
+        with open(LOCAL_FORECAST_PATH) as f:
+            fc = json.load(f)
+        # Basic sanity check
+        if not fc.get("predicted_timestamps") or not fc.get("predicted_values"):
+            return None
+        return fc
+    except Exception:
+        logger.warning("Failed to read forecast.json", exc_info=True)
+        return None
+
+
 def fetch_tide_data(force: bool = False) -> dict:
-    """Returns a dict with raw + smoothed series, using a short-lived
-    in-memory cache so a burst of dashboard visitors doesn't hammer
-    raw.githubusercontent.com."""
     now = time.time()
     if not force and _cache["payload"] is not None and (now - _cache["timestamp"]) < CACHE_TTL_SECONDS:
         return _cache["payload"]
 
-    resp = requests.get(RAW_URL, timeout=20)
-    resp.raise_for_status()
-
-    df = pd.read_csv(io.StringIO(resp.text))
+    df = _load_measured_csv()
     time_col, value_col = _detect_columns(df)
 
     df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
     if df[time_col].dt.tz is None:
-        # ambiguous/nonexistent="NaT" handles the two DST-transition edge
-        # cases (the repeated hour in fall, the skipped hour in spring)
-        # by dropping those specific rows rather than crashing
         df[time_col] = df[time_col].dt.tz_localize(
             SOURCE_DATA_TIMEZONE, ambiguous="NaT", nonexistent="NaT"
         )
@@ -211,7 +201,7 @@ def fetch_tide_data(force: bool = False) -> dict:
         df = df[df[time_col] >= cutoff]
 
     if df.empty:
-        raise ValueError("No usable rows found in measured.csv after filtering.")
+        raise ValueError("No usable rows found in measured data after filtering.")
 
     raw_values = df[value_col].to_numpy(dtype=float)
     smoothed_values = _smooth(raw_values)
@@ -221,7 +211,23 @@ def fetch_tide_data(force: bool = False) -> dict:
     last_ts = df[time_col].iloc[-1]
     gap_minutes = max(0.0, (now_ts - last_ts).total_seconds() / 60)
 
-    predicted_timestamps, predicted_values = _predict_gap(df, time_col, smoothed_values, now_ts)
+    # ------------------------------------------------------------------
+    # Prediction line: prefer XGBoost forecast, else short harmonic bridge
+    # ------------------------------------------------------------------
+    ml_forecast = _load_ml_forecast()
+    if ml_forecast is not None:
+        predicted_timestamps = ml_forecast["predicted_timestamps"]
+        predicted_values = ml_forecast["predicted_values"]
+        logger.info(
+            "Using XGBoost forecast (%d points, generated %s)",
+            len(predicted_timestamps),
+            ml_forecast.get("generated_at", "?"),
+        )
+    else:
+        predicted_timestamps, predicted_values = _predict_gap(
+            df, time_col, smoothed_values, now_ts
+        )
+        logger.info("No ML forecast found – using harmonic gap bridge (%d points)", len(predicted_timestamps))
 
     payload = {
         "timestamps": df[time_col].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist(),
@@ -232,10 +238,11 @@ def fetch_tide_data(force: bool = False) -> dict:
         "gap_minutes": gap_minutes,
         "value_column": value_col,
         "time_column": time_col,
-        "source_url": RAW_URL,
+        "source_url": str(LOCAL_MEASURED_PATH) if LOCAL_MEASURED_PATH.exists() else RAW_URL,
         "fetched_at": now_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "latest_value": float(smoothed_values[-1]),
         "latest_timestamp": last_ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "forecast_source": "xgboost" if ml_forecast is not None else "harmonic_gap",
     }
 
     _cache["timestamp"] = now
