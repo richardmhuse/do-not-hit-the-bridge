@@ -1,8 +1,9 @@
-name: mirror.yml
+# .github/workflows/mirror.yml
+name: Data snapshot
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '5 * * * *'   # once per hour is plenty for git history
   workflow_dispatch:
 
 permissions:
@@ -11,49 +12,21 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      # Ensure directories exist
-      - name: Create data directories
-        run: |
-          mkdir -p data
-          mkdir -p data/processed
-
-      # Fetch datasets
-      - name: Fetch measurement data
-        run: python scripts/fetch_uncw_02.py
-
-      # Show generated files for debugging
-      - name: List generated files
-        run: |
-          echo "RAW DATA:"
-          ls -lah data || true
-
-          echo ""
-          echo "PROCESSED DATA:"
-          ls -lah data/processed || true
-
-      # Commit updated data
-      - name: Commit updated data
+      - run: mkdir -p data/raw data/processed
+      - name: Run full pipeline
+        run: python scripts/fetch_all.py
+      - name: Commit
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-
           git add data/
-
-          git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M') UTC" || echo "No changes to commit"
-
+          git commit -m "Auto-update: $(date -u '+%Y-%m-%d %H:%M') UTC" || echo "No changes"
           git push
