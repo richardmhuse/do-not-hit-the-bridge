@@ -3,7 +3,7 @@ const BRIDGE_CLEARANCE_FT =
   typeof window.__BRIDGE_CLEARANCE_FT__ === "number" ? window.__BRIDGE_CLEARANCE_FT__ : 4.81;
 const MIN_WATER_DEPTH_FT =
   typeof window.__MIN_WATER_DEPTH_FT__ === "number" ? window.__MIN_WATER_DEPTH_FT__ : 1.86;
-const WARNING_MARGIN_FT = .2; // tint the readout within this margin of either threshold
+const WARNING_MARGIN_FT = 0.2; // tint the readout within this margin of either threshold
 
 // On touch devices, use pinch-to-zoom + single-finger pan instead of the
 // desktop rectangular drag-to-zoom (which is awkward with a finger).
@@ -20,7 +20,7 @@ const DISPLAY_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const INITIAL_VIEW_DAYS =
   typeof window.__INITIAL_VIEW_DAYS__ === "number" ? window.__INITIAL_VIEW_DAYS__ : 1.5;
-const INITIAL_VIEW_END_PADDING_HOURS = 3; // breathing room past "now" so the marker isn't flush against the edge;
+const INITIAL_VIEW_END_PADDING_HOURS = 3; // breathing room past "now" so the marker isn't flush against the edge
 
 const VIEWER_PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: DISPLAY_TIME_ZONE,
@@ -48,6 +48,249 @@ function toViewerPlotTimestamps(utcIsoArray) {
   return utcIsoArray.map(toViewerPlotTimestamp);
 }
 
+/* ------------------------------------------------------------------ */
+/*  User threshold preferences (localStorage)                          */
+/* ------------------------------------------------------------------ */
+const PREFS_KEY = "whiskey-creek-thresholds";
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function savePrefs(prefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+function getEffectiveThresholds() {
+  const prefs = loadPrefs();
+  return {
+    showMax: prefs?.showMax ?? true,
+    showMin: prefs?.showMin ?? true,
+    minValue: typeof prefs?.minValue === "number" ? prefs.minValue : MIN_WATER_DEPTH_FT,
+    maxValue: BRIDGE_CLEARANCE_FT, // still the fixed bridge clearance
+  };
+}
+
+function buildThresholdShapesAndAnnotations() {
+  const { showMax, showMin, minValue, maxValue } = getEffectiveThresholds();
+  const shapes = [];
+  const annotations = [];
+
+  if (showMax) {
+    shapes.push({
+      type: "line",
+      xref: "paper",
+      x0: 0,
+      x1: 1,
+      yref: "y",
+      y0: maxValue,
+      y1: maxValue,
+      line: {
+        color: "rgba(255,179,64,.82)",
+        width: 1.8,
+      },
+    });
+    annotations.push({
+      xref: "paper",
+      x: 1,
+      xanchor: "right",
+      yref: "y",
+      y: maxValue,
+      yshift: 14,
+      showarrow: false,
+      align: "right",
+      text: `<b>Bridge Clearance</b><br>${maxValue.toFixed(2)} ft`,
+      font: {
+        family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+        size: 12,
+        color: "#C97A00",
+      },
+      bgcolor: "rgba(255,255,255,.75)",
+      borderpad: 4,
+    });
+  }
+
+  if (showMin) {
+    shapes.push({
+      type: "line",
+      xref: "paper",
+      x0: 0,
+      x1: 1,
+      yref: "y",
+      y0: minValue,
+      y1: minValue,
+      line: {
+        color: "rgba(255,105,97,.82)",
+        width: 1.8,
+      },
+    });
+    annotations.push({
+      xref: "paper",
+      x: 1,
+      xanchor: "right",
+      yref: "y",
+      y: minValue,
+      yshift: -14,
+      showarrow: false,
+      align: "right",
+      text: `<b>Minimum Depth</b><br>${minValue.toFixed(2)} ft`,
+      font: {
+        family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+        size: 12,
+        color: "#D94B43",
+      },
+      bgcolor: "rgba(255,255,255,.75)",
+      borderpad: 4,
+    });
+  }
+
+  return { shapes, annotations };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Settings panel (created automatically)                             */
+/* ------------------------------------------------------------------ */
+function createThresholdPanel() {
+  // Avoid duplicating the panel if the script is ever re-run
+  if (document.getElementById("threshold-panel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "threshold-panel";
+  panel.innerHTML = `
+    <button id="threshold-toggle" type="button" aria-expanded="false" title="Threshold settings">
+      ⚙ Thresholds
+    </button>
+    <div id="threshold-controls" hidden>
+      <label class="th-row">
+        <input type="checkbox" id="show-max" checked>
+        <span>Show maximum (Bridge Clearance)</span>
+      </label>
+      <label class="th-row">
+        <input type="checkbox" id="show-min" checked>
+        <span>Show minimum threshold</span>
+      </label>
+      <label class="th-row">
+        <span>Min value (ft)</span>
+        <input type="number" id="min-value" step="0.01" min="0" value="${MIN_WATER_DEPTH_FT}">
+      </label>
+    </div>
+  `;
+
+  // Minimal styling so it looks decent on most dashboards
+  const style = document.createElement("style");
+  style.textContent = `
+    #threshold-panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      font-size: 13px;
+    }
+    #threshold-toggle {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-size: 13px;
+      color: #1d1d1f;
+    }
+    #threshold-toggle:hover {
+      background: #fff;
+    }
+    #threshold-controls {
+      margin-top: 8px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(0,0,0,0.1);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      min-width: 240px;
+    }
+    .th-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      color: #1d1d1f;
+    }
+    .th-row:last-child {
+      margin-bottom: 0;
+    }
+    #min-value {
+      width: 72px;
+      padding: 4px 6px;
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    #min-value:disabled {
+      opacity: 0.45;
+    }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(panel);
+
+  // Toggle open/close
+  const toggleBtn = document.getElementById("threshold-toggle");
+  const controls = document.getElementById("threshold-controls");
+  toggleBtn.addEventListener("click", () => {
+    const isHidden = controls.hidden;
+    controls.hidden = !isHidden;
+    toggleBtn.setAttribute("aria-expanded", String(isHidden));
+  });
+}
+
+function initThresholdControls() {
+  createThresholdPanel();
+
+  const prefs = getEffectiveThresholds();
+  const showMaxEl = document.getElementById("show-max");
+  const showMinEl = document.getElementById("show-min");
+  const minValueEl = document.getElementById("min-value");
+
+  showMaxEl.checked = prefs.showMax;
+  showMinEl.checked = prefs.showMin;
+  minValueEl.value = prefs.minValue;
+  minValueEl.disabled = !prefs.showMin;
+
+  function onChange() {
+    const showMax = showMaxEl.checked;
+    const showMin = showMinEl.checked;
+    let minValue = parseFloat(minValueEl.value);
+    if (Number.isNaN(minValue) || minValue < 0) minValue = MIN_WATER_DEPTH_FT;
+
+    minValueEl.disabled = !showMin;
+    savePrefs({ showMax, showMin, minValue });
+    applyThresholds();
+  }
+
+  showMaxEl.addEventListener("change", onChange);
+  showMinEl.addEventListener("change", onChange);
+  minValueEl.addEventListener("change", onChange);
+  minValueEl.addEventListener("input", () => {
+    // live update while typing is optional; we keep it on change for less noise
+  });
+}
+
+function applyThresholds() {
+  if (!chartInitialized) return;
+  const { shapes, annotations } = buildThresholdShapesAndAnnotations();
+  Plotly.relayout("chart", { shapes, annotations });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Original chart plumbing (slightly adapted)                         */
+/* ------------------------------------------------------------------ */
 const dot = document.getElementById("status-dot");
 const statusText = document.getElementById("status-text");
 const readout = document.getElementById("readout");
@@ -55,196 +298,79 @@ const readoutMeta = document.getElementById("readout-meta");
 const errorBanner = document.getElementById("error-banner");
 
 const CHART_LAYOUT = {
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-
-    margin: {
-        l: 58,
-        r: 30,
-        t: 28,
-        b: 54
-    },
-
+  paper_bgcolor: "rgba(0,0,0,0)",
+  plot_bgcolor: "rgba(0,0,0,0)",
+  margin: {
+    l: 58,
+    r: 30,
+    t: 28,
+    b: 54,
+  },
+  font: {
+    family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif',
+    size: 13,
+    color: "#1d1d1f",
+  },
+  showlegend: false,
+  hovermode: "x unified",
+  hoverlabel: {
+    bgcolor: "rgba(255,255,255,0.94)",
+    bordercolor: "rgba(0,0,0,.08)",
     font: {
-        family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif',
+      family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
+      size: 13,
+      color: "#1d1d1f",
+    },
+  },
+  dragmode: IS_TOUCH_DEVICE ? "pan" : "zoom",
+  xaxis: {
+    tickformat: "%b %-d\n%I %p",
+    showgrid: true,
+    gridcolor: "rgba(0,0,0,.03)",
+    gridwidth: 1,
+    zeroline: false,
+    showline: false,
+    ticks: "",
+    ticklen: 0,
+    tickfont: {
+      size: 12,
+      color: "#86868b",
+    },
+    showspikes: true,
+    spikecolor: "rgba(0,122,255,.35)",
+    spikemode: "across",
+    spikethickness: 1,
+    spikedash: "solid",
+  },
+  yaxis: {
+    title: {
+      text: "Water Level (ft)",
+      font: {
         size: 13,
-        color: '#1d1d1f'
+        color: "#6e6e73",
+      },
     },
-
-    showlegend: false,
-
-    hovermode: 'x unified',
-
-    hoverlabel: {
-        bgcolor: 'rgba(255,255,255,0.94)',
-        bordercolor: 'rgba(0,0,0,.08)',
-        font: {
-            family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
-            size: 13,
-            color: '#1d1d1f'
-        }
+    showgrid: true,
+    gridcolor: "rgba(0,0,0,.045)",
+    gridwidth: 1,
+    zeroline: false,
+    showline: false,
+    ticks: "",
+    ticklen: 0,
+    tickfont: {
+      size: 12,
+      color: "#86868b",
     },
-
-    dragmode: IS_TOUCH_DEVICE ? 'pan' : 'zoom',
-
-    xaxis: {
-        tickformat: "%b %-d\n%I %p",
-
-        showgrid: true,
-        gridcolor: "rgba(0,0,0,.03)",
-        gridwidth: 1,
-
-        zeroline: false,
-        showline: false,
-
-        ticks: "",
-        ticklen: 0,
-
-        tickfont: {
-            size: 12,
-            color: "#86868b"
-        },
-
-        showspikes: true,
-        spikecolor: "rgba(0,122,255,.35)",
-        spikemode: "across",
-        spikethickness: 1,
-        spikedash: "solid"
-    },
-
-    yaxis: {
-
-        title: {
-            text: "Water Level (ft)",
-            font: {
-                size: 13,
-                color: "#6e6e73"
-            }
-        },
-
-        showgrid: true,
-        gridcolor: "rgba(0,0,0,.045)",
-        gridwidth: 1,
-
-        zeroline: false,
-        showline: false,
-
-        ticks: "",
-        ticklen: 0,
-
-        tickfont: {
-            size: 12,
-            color: "#86868b"
-        }
-    },
-
-    shapes: [
-
-        // Bridge clearance
-
-        {
-            type: "line",
-
-            xref: "paper",
-            x0: 0,
-            x1: 1,
-
-            yref: "y",
-            y0: BRIDGE_CLEARANCE_FT,
-            y1: BRIDGE_CLEARANCE_FT,
-
-            line: {
-                color: "rgba(255,179,64,.82)",
-                width: 1.8
-            }
-        },
-
-        // Minimum depth
-
-        {
-            type: "line",
-
-            xref: "paper",
-            x0: 0,
-            x1: 1,
-
-            yref: "y",
-            y0: MIN_WATER_DEPTH_FT,
-            y1: MIN_WATER_DEPTH_FT,
-
-            line: {
-                color: "rgba(255,105,97,.82)",
-                width: 1.8
-            }
-        }
-
-    ],
-
-    annotations: [
-
-        {
-            xref: "paper",
-            x: 1,
-            xanchor: "right",
-
-            yref: "y",
-            y: BRIDGE_CLEARANCE_FT,
-
-            yshift: 14,
-
-            showarrow: false,
-
-            align: "right",
-
-            text:
-                "<b>Bridge Clearance</b><br>" +
-                BRIDGE_CLEARANCE_FT.toFixed(2) +
-                " ft",
-
-            font: {
-                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
-                size: 12,
-                color:"#C97A00",
-              bgcolor:"rgba(255,255,255,.75)",
-borderpad:4,
-            }
-        },
-
-        {
-            xref: "paper",
-            x: 1,
-            xanchor: "right",
-
-            yref: "y",
-            y: MIN_WATER_DEPTH_FT,
-
-            yshift: -14,
-
-            showarrow: false,
-
-            align: "right",
-
-            text:
-                "<b>Minimum Depth</b><br>" +
-                MIN_WATER_DEPTH_FT.toFixed(2) +
-                " ft",
-
-            font: {
-                family: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif',
-                size: 12,
-                color:"#D94B43",
-              bgcolor:"rgba(255,255,255,.75)",
-borderpad:4,
-            }
-        }
-
-    ],
-
-    transition: {
-        duration: 500,
-        easing: "cubic-in-out"
-    }
+  },
+  // shapes & annotations are now supplied dynamically
+  shapes: [],
+  annotations: [],
+  transition: {
+    duration: 500,
+    easing: "cubic-in-out",
+  },
 };
+
 let chartInitialized = false;
 let lastPayload = null;
 let nowTraceIndex = null;
@@ -257,10 +383,10 @@ function computeInitialXRange(data) {
     toViewerPlotTimestamp(new Date(startMs).toISOString()),
     toViewerPlotTimestamp(new Date(endMs).toISOString()),
   ];
-};
+}
+
 function buildTraces(data) {
   const viewerTimestamps = toViewerPlotTimestamps(data.timestamps);
-
   const traces = [
     {
       x: viewerTimestamps,
@@ -268,160 +394,126 @@ function buildTraces(data) {
       mode: "markers",
       marker: { color: "rgba(124, 147, 168, 0.35)", size: 3 },
       hovertemplate:
-"<b>%{y:.2f} ft</b><br>" +
-"Measured<br>" +
-"%{x|%b %d, %I:%M %p}" +
-"<extra></extra>",
+        "<b>%{y:.2f} ft</b><br>" +
+        "Measured<br>" +
+        "%{x|%b %d, %I:%M %p}" +
+        "<extra></extra>",
       name: "raw",
     },
     {
-    x: viewerTimestamps,
-    y: data.smoothed,
-
-    mode: "lines",
-
-    line: {
+      x: viewerTimestamps,
+      y: data.smoothed,
+      mode: "lines",
+      line: {
         color: "#0A84FF",
         width: 4,
         shape: "spline",
-        smoothing: 0.65
+        smoothing: 0.65,
+      },
+      fill: "tozeroy",
+      fillcolor: "rgba(10,132,255,.14)",
+      name: "Water Level",
+      hoverinfo: "skip",
+      showlegend: false,
     },
-
-    fill: "tozeroy",
-
-    fillcolor: "rgba(10,132,255,.14)",
-
-    name: "Water Level",
-
-    hoverinfo: "skip",
-showlegend: false,
-},
   ];
 
   const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
-
   if (hasPrediction) {
     traces.push({
       x: toViewerPlotTimestamps(data.predicted_timestamps).slice(1),
-y: data.predicted_values.slice(1),
+      y: data.predicted_values.slice(1),
       mode: "lines",
       line: {
-    color: "#0A84FF",
-    width: 4,
-    dash: "dot",
-    shape: "spline"
-},
-
-opacity: .55,
+        color: "#0A84FF",
+        width: 4,
+        dash: "dot",
+        shape: "spline",
+      },
+      opacity: 0.55,
       name: "predicted",
       hovertemplate:
-"<b>%{y:.2f} ft</b><br>" +
-"Predicted<br>" +
-"%{x|%b %d, %I:%M %p}" +
-"<extra></extra>",
+        "<b>%{y:.2f} ft</b><br>" +
+        "Predicted<br>" +
+        "%{x|%b %d, %I:%M %p}" +
+        "<extra></extra>",
     });
   }
 
-  // "now" marker: seeded here at the true current time (not just the
-  // tail end of whatever the predicted segment happened to compute at
-  // fetch time), then kept moving every second by tickNowMarker() below.
+  // "now" marker
   const seed = interpolateNowValue(data, Date.now());
   traces.push({
     x: [toViewerPlotTimestamp(seed.utcIso)],
     y: [seed.value],
-    mode:"markers+text",
-
-text:["Now"],
-
-textposition:"top center",
-
-textfont:{
-    family:'-apple-system',
-    size:11,
-    color:"#0A84FF"
-},
-    marker:{
-    size:13,
-
-    color:"#FFFFFF",
-
-    line:{
-        color:"#0A84FF",
-        width:3
-    }
-},
+    mode: "markers+text",
+    text: ["Now"],
+    textposition: "top center",
+    textfont: {
+      family: "-apple-system",
+      size: 11,
+      color: "#0A84FF",
+    },
+    marker: {
+      size: 13,
+      color: "#FFFFFF",
+      line: {
+        color: "#0A84FF",
+        width: 3,
+      },
+    },
     hoverinfo: "skip",
-showlegend: false,
+    showlegend: false,
   });
 
   return traces;
 }
 
 /**
- * Finds where "now" (or any given instant, in epoch ms) sits along the
- * predicted segment, linearly interpolating between the two bracketing
- * predicted points. The predicted line only covers up to whatever "now"
- * was AT THE LAST FETCH — real time keeps moving between the ~60s polls,
- * so nowMs can walk past the end of that segment. Rather than pinning
- * the marker to a stale fixed point (which drifts further from true
- * "now" the longer it's been since the last fetch), this clamps to the
- * last predicted point so the marker holds steady there until the next
- * fetch extends the line further, instead of appearing to jump forward.
+ * Finds where "now" sits along the predicted segment.
  */
 function interpolateNowValue(payload, nowMs) {
   const hasPrediction = payload.predicted_timestamps && payload.predicted_timestamps.length > 1;
   if (!hasPrediction) {
     return { utcIso: payload.latest_timestamp, value: payload.latest_value };
   }
-
   const times = payload.predicted_timestamps.map((t) => new Date(t).getTime());
   const values = payload.predicted_values;
-
   if (nowMs <= times[0]) {
     return { utcIso: payload.predicted_timestamps[0], value: values[0] };
   }
   if (nowMs >= times[times.length - 1]) {
     return {
       utcIso: payload.predicted_timestamps[times.length - 1],
-      value: values[values.length - 1],
+      value: values[times.length - 1],
     };
   }
-
   for (let i = 0; i < times.length - 1; i++) {
     if (nowMs >= times[i] && nowMs <= times[i + 1]) {
       const span = times[i + 1] - times[i];
       const frac = span === 0 ? 0 : (nowMs - times[i]) / span;
-      return { utcIso: new Date(nowMs).toISOString(), value: values[i] + (values[i + 1] - values[i]) * frac };
+      return {
+        utcIso: new Date(nowMs).toISOString(),
+        value: values[i] + (values[i + 1] - values[i]) * frac,
+      };
     }
   }
-
-  // shouldn't be reachable given the clamps above, but fail safe
-  return { utcIso: payload.predicted_timestamps[times.length - 1], value: values[values.length - 1] };
+  return {
+    utcIso: payload.predicted_timestamps[times.length - 1],
+    value: values[times.length - 1],
+  };
 }
 
 function setStatus(ok) {
-  dot.classList.toggle("stale", !ok);
-  statusText.textContent = ok
-    ? "Live \u00b7 Whiskey Creek"
-    : "Feed unavailable \u2014 showing last known data";
+  if (dot) dot.classList.toggle("stale", !ok);
+  if (statusText) {
+    statusText.textContent = ok
+      ? "Live · Whiskey Creek"
+      : "Feed unavailable — showing last known data";
+  }
 }
 
 /**
- * Plotly's built-in scrollZoom config reliably handles mouse-wheel zoom
- * and pinch-zoom on map/3D subplots, but doesn't reliably translate a
- * two-finger pinch into a zoom on plain SVG cartesian charts (like this
- * one) across mobile browsers — it tends to fall through to treating it
- * as a single-finger pan, which is exactly the bug this works around.
- *
- * This attaches raw touch listeners directly to the chart div, in the
- * capture phase, so we see two-finger touches before Plotly's own
- * (bubble-phase) pan handler does. Single-finger touches are left
- * completely alone and continue to work exactly as before (normal pan).
- * Only once a second finger comes down do we take over: we read Plotly's
- * internal axis pixel<->data conversion (`_fullLayout.<axis>.p2d`) to
- * find the data coordinate under the pinch midpoint, then scale the
- * visible x/y range around that point as the two fingers move apart or
- * together, applying it via Plotly.relayout.
+ * Pinch-zoom workaround for mobile.
  */
 function setupPinchZoom(gd) {
   let pinchState = null;
@@ -439,13 +531,6 @@ function setupPinchZoom(gd) {
     };
   }
 
-  // Plotly's axis.p2d() returns a plain number for linear axes, but a
-  // Date object for date-type axes (like our x-axis, which is
-  // timestamps). JS's +/- operators silently coerce Date objects to
-  // strings rather than numbers in this kind of arithmetic, which is
-  // what was producing garbage x-ranges. Normalize everything to a
-  // millisecond number up front so the math is safe regardless of axis
-  // type.
   function toMillis(v) {
     if (v instanceof Date) return v.getTime();
     if (typeof v === "number") return v;
@@ -457,9 +542,7 @@ function setupPinchZoom(gd) {
     const fullLayout = gd._fullLayout;
     const xa = fullLayout && fullLayout.xaxis;
     const ya = fullLayout && fullLayout.yaxis;
-    if (!xa || !ya || typeof xa.p2d !== "function") {
-      return; // chart not fully rendered yet - skip this gesture rather than throw
-    }
+    if (!xa || !ya || typeof xa.p2d !== "function") return;
 
     const rect = gd.getBoundingClientRect();
     const mid = touchMidpoint(e.touches);
@@ -495,14 +578,12 @@ function setupPinchZoom(gd) {
       if (e.touches.length === 2 && pinchState) {
         e.preventDefault();
         e.stopPropagation();
-
         const newDistance = touchDistance(e.touches);
         if (newDistance < 1) return;
 
-        // fingers moving apart -> zoom in (narrower range); together -> zoom out
         const scale = pinchState.startDistance / newDistance;
-        const MIN_SCALE = 0.05; // cap how far a single gesture can zoom in
-        const MAX_SCALE = 20; // cap how far a single gesture can zoom out
+        const MIN_SCALE = 0.05;
+        const MAX_SCALE = 20;
         const clampedScale = Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
 
         const newXMillis = pinchState.startXRange.map(
@@ -529,11 +610,8 @@ function setupPinchZoom(gd) {
   );
 
   function endPinch(e) {
-    if (e.touches.length < 2) {
-      pinchState = null;
-    }
+    if (e.touches.length < 2) pinchState = null;
   }
-
   gd.addEventListener("touchend", endPinch, { capture: true });
   gd.addEventListener("touchcancel", endPinch, { capture: true });
 }
@@ -554,78 +632,89 @@ async function refresh() {
   try {
     const res = await fetch("/api/data");
     const data = await res.json();
-
     if (!data.ok) {
       throw new Error(data.error || "Unknown error");
     }
 
-    errorBanner.classList.remove("visible");
+    if (errorBanner) errorBanner.classList.remove("visible");
     setStatus(true);
 
-    readout.innerHTML = `${data.latest_value.toFixed(2)}<span class="unit">ft</span>`;
-    const nearHigh = BRIDGE_CLEARANCE_FT - data.latest_value <= WARNING_MARGIN_FT;
-    const nearLow = data.latest_value - MIN_WATER_DEPTH_FT <= WARNING_MARGIN_FT;
-    readout.classList.toggle("near-limit-high", nearHigh && !nearLow);
-    readout.classList.toggle("near-limit-low", nearLow);
-    readoutMeta.textContent = `As of ${formatTimestamp(data.latest_timestamp)} \u00b7 fetched ${formatTimestamp(data.fetched_at)}`;
+    if (readout) {
+      readout.innerHTML = `${data.latest_value.toFixed(2)}<span class="unit">ft</span>`;
+    }
+
+    // Use the user's effective thresholds for the warning tint
+    const { minValue, maxValue } = getEffectiveThresholds();
+    const nearHigh = maxValue - data.latest_value <= WARNING_MARGIN_FT;
+    const nearLow = data.latest_value - minValue <= WARNING_MARGIN_FT;
+    if (readout) {
+      readout.classList.toggle("near-limit-high", nearHigh && !nearLow);
+      readout.classList.toggle("near-limit-low", nearLow);
+    }
+
+    if (readoutMeta) {
+      readoutMeta.textContent = `As of ${formatTimestamp(data.latest_timestamp)} · fetched ${formatTimestamp(data.fetched_at)}`;
+    }
 
     const traces = buildTraces(data);
     lastPayload = data;
     nowTraceIndex = traces.length - 1;
 
+    const { shapes, annotations } = buildThresholdShapesAndAnnotations();
     const plotlyConfig = { displayModeBar: false, responsive: true, scrollZoom: false };
+
     if (!chartInitialized) {
-  const initialLayout = {
-    ...CHART_LAYOUT,
-    xaxis: { ...CHART_LAYOUT.xaxis, range: computeInitialXRange(data) },
-  };
-  Plotly.newPlot("chart", traces, initialLayout, plotlyConfig);
-  chartInitialized = true;
-  if (IS_TOUCH_DEVICE) {
-    setupPinchZoom(document.getElementById("chart"));
-  }
-} else {
-  const gd = document.getElementById("chart");
-
-const layout = {
-  ...CHART_LAYOUT,
-  xaxis: {
-    ...CHART_LAYOUT.xaxis
-  }
-};
-
-// Preserve whatever view the user is currently looking at
-if (gd.layout?.xaxis?.range) {
-  layout.xaxis.range = [...gd.layout.xaxis.range];
-} else {
-  layout.xaxis.range = computeInitialXRange(data);
-}
-
-Plotly.react(gd, traces, layout, plotlyConfig);
-}
+      const initialLayout = {
+        ...CHART_LAYOUT,
+        shapes,
+        annotations,
+        xaxis: { ...CHART_LAYOUT.xaxis, range: computeInitialXRange(data) },
+      };
+      Plotly.newPlot("chart", traces, initialLayout, plotlyConfig);
+      chartInitialized = true;
+      if (IS_TOUCH_DEVICE) {
+        setupPinchZoom(document.getElementById("chart"));
+      }
+    } else {
+      const gd = document.getElementById("chart");
+      const layout = {
+        ...CHART_LAYOUT,
+        shapes,
+        annotations,
+        xaxis: { ...CHART_LAYOUT.xaxis },
+      };
+      // Preserve whatever view the user is currently looking at
+      if (gd.layout?.xaxis?.range) {
+        layout.xaxis.range = [...gd.layout.xaxis.range];
+      } else {
+        layout.xaxis.range = computeInitialXRange(data);
+      }
+      Plotly.react(gd, traces, layout, plotlyConfig);
+    }
   } catch (err) {
     setStatus(false);
-    errorBanner.textContent = `Could not load gauge data: ${err.message}`;
-    errorBanner.classList.add("visible");
+    if (errorBanner) {
+      errorBanner.textContent = `Could not load gauge data: ${err.message}`;
+      errorBanner.classList.add("visible");
+    }
   }
 }
 
 /**
- * Runs every second so the "now" marker keeps moving to the actual
- * current time between the ~60s data polls, instead of sitting frozen
- * wherever it was when the last fetch completed. Cheap: only restyles
- * the single marker trace, not a full chart redraw.
+ * Runs every second so the "now" marker keeps moving.
  */
 function tickNowMarker() {
   if (!lastPayload || nowTraceIndex === null || !chartInitialized) return;
-
   const nowMs = Date.now();
   const { utcIso, value } = interpolateNowValue(lastPayload, nowMs);
   const displayX = toViewerPlotTimestamp(utcIso);
-
   Plotly.restyle("chart", { x: [[displayX]], y: [[value]] }, [nowTraceIndex]);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Boot                                                               */
+/* ------------------------------------------------------------------ */
+initThresholdControls();
 refresh();
 setInterval(refresh, REFRESH_MS);
 setInterval(tickNowMarker, 1000);
