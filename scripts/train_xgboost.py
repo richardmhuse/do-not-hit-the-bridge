@@ -25,7 +25,10 @@ EXCLUDE = {
     "measured_Water Level",
     "measured_depth",
     "measured_value",
-    "phase_name", "short_forecast", "wind_direction", "station",
+    "phase_name",
+    "short_forecast",
+    "wind_direction",
+    "station",
 }
 
 TARGET_CANDIDATES = [
