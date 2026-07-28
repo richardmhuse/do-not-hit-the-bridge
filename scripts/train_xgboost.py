@@ -82,6 +82,13 @@ def main(
     X, y, feature_cols = prepare_xy(df, target)
     print(f"Usable rows: {len(X)}  |  features: {len(feature_cols)}")
 
+MIN_ROWS = 48          # at least ~2 days of hourly-ish data
+if len(X) < MIN_ROWS:
+    raise SystemExit(
+        f"Not enough usable rows ({len(X)} < {MIN_ROWS}). "
+        "Fetch more history or reduce lag requirements."
+    )
+
     # Time-based split (last N days = test)
     cutoff = X.index.max() - pd.Timedelta(days=test_days)
     train_mask = X.index < cutoff
