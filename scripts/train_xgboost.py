@@ -18,7 +18,6 @@ MODEL_DIR = DATA_PROCESSED / "model"
 MODEL_PATH = MODEL_DIR / "xgb_model.json"
 META_PATH = MODEL_DIR / "model_meta.json"
 
-# Columns that must never be used as features
 EXCLUDE = {
     "measured_gauge_height_ft",
     "measured_water_level",
@@ -32,6 +31,7 @@ EXCLUDE = {
 }
 
 TARGET_CANDIDATES = [
+    "measured_gauge_height_ft",
     "measured_water_level",
     "measured_Water Level",
     "measured_depth",
@@ -59,14 +59,12 @@ def prepare_xy(df: pd.DataFrame, target: str):
     X = numeric[feature_cols].copy()
     y = numeric[target].copy()
 
-    # --- Impute instead of complete-case drop ---
-    # 1. Target must exist
+    # 1. Keep rows where the target exists
     mask = y.notna()
     X = X.loc[mask]
     y = y.loc[mask]
 
-    # 2. Forward/back fill time-series features (tide, weather, lunar, rain)
-    #    then fill any remaining holes with column median / 0
+    # 2. Impute sparse external features instead of dropping rows
     X = X.ffill().bfill()
 
     for col in X.columns:
@@ -85,14 +83,17 @@ def prepare_xy(df: pd.DataFrame, target: str):
 
     return X, y, feature_cols
 
+
 def main(
-    test_days: int = 7,
+    test_days: int = 2,          # measured history is only ~5 days
     n_estimators: int = 400,
     max_depth: int = 6,
     learning_rate: float = 0.05,
 ):
     if not FEATURES_PATH.exists():
-        raise FileNotFoundError(f"{FEATURES_PATH} not found – run build_features.py first")
+        raise FileNotFoundError(
+            f"{FEATURES_PATH} not found – run build_features.py first"
+        )
 
     print("Loading features…")
     df = pd.read_csv(FEATURES_PATH, index_col=0, parse_dates=True)
@@ -104,25 +105,29 @@ def main(
     print(f"Target: {target}")
 
     X, y, feature_cols = prepare_xy(df, target)
-    print(f"Usable rows: {len(X)} | features: {len(feature_cols)}")
+    print(f"Usable rows: {len(X)}  |  features: {len(feature_cols)}")
 
-    MIN_ROWS = 48   # fine once imputation is in place
+    MIN_ROWS = 48
+    if len(X) < MIN_ROWS:
+        raise SystemExit(
+            f"Not enough usable rows ({len(X)} < {MIN_ROWS}). "
+            "Fetch more history or reduce lag requirements."
+        )
 
-print(f"Usable rows: {len(X)}  |  features: {len(feature_cols)}")
-
-if len(X) < MIN_ROWS:
-    raise SystemExit(
-        f"Not enough usable rows ({len(X)} < {MIN_ROWS}). "
-        "Fetch more history or reduce lag requirements."
-    )
-
-    # Time-based split (last N days = test)
+    # Time-based split
     cutoff = X.index.max() - pd.Timedelta(days=test_days)
     train_mask = X.index < cutoff
     test_mask = X.index >= cutoff
 
     X_train, y_train = X.loc[train_mask], y.loc[train_mask]
     X_test, y_test = X.loc[test_mask], y.loc[test_mask]
+
+    # Fallback if the test window is empty (short history)
+    if len(X_test) < 5 or len(X_train) < 20:
+        split = int(len(X) * 0.8)
+        X_train, y_train = X.iloc[:split], y.iloc[:split]
+        X_test, y_test = X.iloc[split:], y.iloc[split:]
+        print("Short history – using 80/20 sequential split instead of calendar days")
 
     print(f"Train: {len(X_train)} rows  |  Test: {len(X_test)} rows")
 
@@ -139,20 +144,19 @@ if len(X) < MIN_ROWS:
 
     print("Training…")
     model.fit(
-        X_train, y_train,
+        X_train,
+        y_train,
         eval_set=[(X_test, y_test)],
         verbose=False,
     )
 
-    # Evaluation
     pred_test = model.predict(X_test)
     mae = mean_absolute_error(y_test, pred_test)
     rmse = mean_squared_error(y_test, pred_test, squared=False)
-    print(f"\nHold-out performance (last {test_days} days)")
+    print(f"\nHold-out performance")
     print(f"  MAE  : {mae:.4f} ft")
     print(f"  RMSE : {rmse:.4f} ft")
 
-    # Feature importance (top 15)
     importance = (
         pd.Series(model.feature_importances_, index=feature_cols)
         .sort_values(ascending=False)
@@ -161,7 +165,6 @@ if len(X) < MIN_ROWS:
     print("\nTop feature importances:")
     print(importance.to_string())
 
-    # Persist
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model.save_model(MODEL_PATH)
 
