@@ -20,9 +20,11 @@ META_PATH = MODEL_DIR / "model_meta.json"
 
 # Columns that must never be used as features
 EXCLUDE = {
-    # the target itself and any future leakage
-    "measured_water_level", "measured_Water Level", "measured_depth", "measured_value",
-    # pure identifiers / non-numeric
+    "measured_gauge_height_ft",
+    "measured_water_level",
+    "measured_Water Level",
+    "measured_depth",
+    "measured_value",
     "phase_name", "short_forecast", "wind_direction", "station",
 }
 
