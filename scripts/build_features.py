@@ -81,9 +81,12 @@ def main():
     df = add_lag_features(df, target, lags)
     df = add_rolling_features(df, target)
 
-    if "tide_ft" in df.columns:
+  if "tide_ft" in df.columns:
         df["tide_residual"] = df[target] - df["tide_ft"]
-        resid_lags = [lag for lag in (1, 2, 3, 6) if lag in lags or lag <= 6]
+        # lags of the residual (these become the main autoregressive signal)
+        resid_lags = [1, 2, 3, 6, 12, 24]
+        # only keep lags the series can support
+        resid_lags = [lag for lag in resid_lags if lag < len(df) // 3]
         df = add_lag_features(df, "tide_residual", resid_lags)
 
     if "rain_inches" in df.columns:
