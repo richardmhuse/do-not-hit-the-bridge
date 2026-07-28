@@ -1,6 +1,8 @@
 """
 Train an XGBoost model on data/processed/features.csv
 and save the model + metadata for later inference.
+
+Trains on tide_residual = measured - tide_ft when possible.
 """
 from pathlib import Path
 import json
@@ -30,23 +32,16 @@ EXCLUDE = {
     "station",
 }
 
-TARGET_CANDIDATES = [
-    "measured_gauge_height_ft",
-    "measured_water_level",
-    "measured_Water Level",
-    "measured_depth",
-    "measured_value",
-]
-
-
-RESIDUAL_TARGET = "tide_residual"   # we will create / use this
 
 def find_target(df: pd.DataFrame) -> str:
-    """Prefer the residual if it exists; otherwise fall back."""
-    if "tide_residual" in df.columns:
+    """Prefer residual if present; otherwise fall back to absolute level."""
+    if "tide_residual" in df.columns and df["tide_residual"].notna().any():
         return "tide_residual"
-    # fallback (should not happen once build_features is correct)
-    for c in ["measured_gauge_height_ft", "measured_water_level", "measured_value"]:
+    for c in [
+        "measured_gauge_height_ft",
+        "measured_water_level",
+        "measured_value",
+    ]:
         if c in df.columns:
             return c
     measured = [c for c in df.columns if c.startswith("measured_")]
@@ -65,14 +60,13 @@ def prepare_xy(df: pd.DataFrame, target: str):
     X = numeric[feature_cols].copy()
     y = numeric[target].copy()
 
-    # 1. Keep rows where the target exists
+    # Keep rows where the target exists
     mask = y.notna()
     X = X.loc[mask]
     y = y.loc[mask]
 
-    # 2. Impute sparse external features instead of dropping rows
+    # Impute sparse external features
     X = X.ffill().bfill()
-
     for col in X.columns:
         if X[col].isna().any():
             if "rain" in col.lower():
@@ -81,31 +75,39 @@ def prepare_xy(df: pd.DataFrame, target: str):
                 med = X[col].median()
                 X[col] = X[col].fillna(med if pd.notna(med) else 0.0)
 
-    # Final safety
     still_bad = X.isna().any(axis=1) | y.isna()
-        if still_bad.any():
-            X = X.loc[~still_bad]
-            y = y.loc[~still_bad]
+    if still_bad.any():
+        X = X.loc[~still_bad]
+        y = y.loc[~still_bad]
 
-        return X, y, feature_cols
+    return X, y, feature_cols
 
 
 def main(
-    test_days: int = 2,          # measured history is only ~5 days
+    test_days: int = 2,
     n_estimators: int = 400,
     max_depth: int = 6,
     learning_rate: float = 0.05,
 ):
-        # Ensure residual exists and is clean
+    if not FEATURES_PATH.exists():
+        raise FileNotFoundError(
+            f"{FEATURES_PATH} not found – run build_features.py first"
+        )
+
+    print("Loading features…")
+    df = pd.read_csv(FEATURES_PATH, index_col=0, parse_dates=True)
+    if df.index.tz is None:
+        df.index = pd.to_datetime(df.index, utc=True)
+    df = df.sort_index()
+
+    # --- Build residual target ---
     if "tide_ft" not in df.columns:
         raise ValueError("tide_ft missing – cannot train residual model")
     if "measured_gauge_height_ft" not in df.columns:
-        # adjust name if your column is different
         raise ValueError("measured_gauge_height_ft missing")
 
     df["tide_residual"] = df["measured_gauge_height_ft"] - df["tide_ft"]
-    # drop rows where we couldn't form a residual
-    df = df.dropna(subset=["tide_residual", "tide_ft"])
+    df = df.dropna(subset=["tide_residual", "tide_ft", "measured_gauge_height_ft"])
 
     target = find_target(df)
     print(f"Target: {target}")
@@ -128,7 +130,6 @@ def main(
     X_train, y_train = X.loc[train_mask], y.loc[train_mask]
     X_test, y_test = X.loc[test_mask], y.loc[test_mask]
 
-    # Fallback if the test window is empty (short history)
     if len(X_test) < 5 or len(X_train) < 20:
         split = int(len(X) * 0.8)
         X_train, y_train = X.iloc[:split], y.iloc[:split]
@@ -159,7 +160,7 @@ def main(
     pred_test = model.predict(X_test)
     mae = mean_absolute_error(y_test, pred_test)
     rmse = float(np.sqrt(mean_squared_error(y_test, pred_test)))
-    print(f"\nHold-out performance")
+    print(f"\nHold-out performance (on residual)")
     print(f"  MAE  : {mae:.4f} ft")
     print(f"  RMSE : {rmse:.4f} ft")
 
