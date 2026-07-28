@@ -39,8 +39,14 @@ TARGET_CANDIDATES = [
 ]
 
 
+RESIDUAL_TARGET = "tide_residual"   # we will create / use this
+
 def find_target(df: pd.DataFrame) -> str:
-    for c in TARGET_CANDIDATES:
+    """Prefer the residual if it exists; otherwise fall back."""
+    if "tide_residual" in df.columns:
+        return "tide_residual"
+    # fallback (should not happen once build_features is correct)
+    for c in ["measured_gauge_height_ft", "measured_water_level", "measured_value"]:
         if c in df.columns:
             return c
     measured = [c for c in df.columns if c.startswith("measured_")]
