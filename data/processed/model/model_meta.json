@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-07-28T19:25:30.691766+00:00",
+  "trained_at": "2026-07-28T19:34:10.263800+00:00",
   "target": "measured_gauge_height_ft",
   "feature_cols": [
     "tide_ft",
@@ -32,10 +32,10 @@
     "tide_residual_lag3",
     "tide_residual_lag6"
   ],
-  "n_train": 877,
+  "n_train": 880,
   "n_test": 577,
-  "mae": 0.0723474940146276,
-  "rmse": 0.16144240055191644,
+  "mae": 0.07006087859333905,
+  "rmse": 0.16016554889938425,
   "test_days": 2,
   "xgb_params": {
     "n_estimators": 400,
