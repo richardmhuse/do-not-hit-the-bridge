@@ -81,7 +81,7 @@ def main(
     target = find_target(df)
     print(f"Target: {target}")
 
-       X, y, feature_cols = prepare_xy(df, target)
+    X, y, feature_cols = prepare_xy(df, target)
     print(f"Usable rows: {len(X)} | features: {len(feature_cols)}")
 
     MIN_ROWS = 48
