@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-07-28T19:16:02.784722+00:00",
+  "trained_at": "2026-07-28T19:25:30.691766+00:00",
   "target": "measured_gauge_height_ft",
   "feature_cols": [
     "tide_ft",
