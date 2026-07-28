@@ -48,20 +48,39 @@ def find_target(df: pd.DataFrame) -> str:
 
 def prepare_xy(df: pd.DataFrame, target: str):
     """Return X, y and the ordered list of feature names."""
-    # Keep only numeric columns
     numeric = df.select_dtypes(include=[np.number]).copy()
 
-    # Drop the target and any explicitly excluded columns
     drop_cols = [c for c in numeric.columns if c == target or c in EXCLUDE]
     feature_cols = [c for c in numeric.columns if c not in drop_cols]
 
-    X = numeric[feature_cols]
-    y = numeric[target]
+    X = numeric[feature_cols].copy()
+    y = numeric[target].copy()
 
-    # Final safety: drop rows that still have NaNs in features or target
-    mask = X.notna().all(axis=1) & y.notna()
-    return X.loc[mask], y.loc[mask], feature_cols
+    # --- Impute instead of complete-case drop ---
+    # 1. Target must exist
+    mask = y.notna()
+    X = X.loc[mask]
+    y = y.loc[mask]
 
+    # 2. Forward/back fill time-series features (tide, weather, lunar, rain)
+    #    then fill any remaining holes with column median / 0
+    X = X.ffill().bfill()
+
+    for col in X.columns:
+        if X[col].isna().any():
+            if "rain" in col.lower():
+                X[col] = X[col].fillna(0.0)
+            else:
+                med = X[col].median()
+                X[col] = X[col].fillna(med if pd.notna(med) else 0.0)
+
+    # Final safety
+    still_bad = X.isna().any(axis=1) | y.isna()
+    if still_bad.any():
+        X = X.loc[~still_bad]
+        y = y.loc[~still_bad]
+
+    return X, y, feature_cols
 
 def main(
     test_days: int = 7,
@@ -84,12 +103,15 @@ def main(
     X, y, feature_cols = prepare_xy(df, target)
     print(f"Usable rows: {len(X)} | features: {len(feature_cols)}")
 
-    MIN_ROWS = 48
-    if len(X) < MIN_ROWS:
-        raise SystemExit(
-            f"Not enough usable rows ({len(X)} < {MIN_ROWS}). "
-            "Fetch more history or reduce lag requirements."
-        )
+    MIN_ROWS = 48   # fine once imputation is in place
+
+print(f"Usable rows: {len(X)}  |  features: {len(feature_cols)}")
+
+if len(X) < MIN_ROWS:
+    raise SystemExit(
+        f"Not enough usable rows ({len(X)} < {MIN_ROWS}). "
+        "Fetch more history or reduce lag requirements."
+    )
 
     # Time-based split (last N days = test)
     cutoff = X.index.max() - pd.Timedelta(days=test_days)
