@@ -226,7 +226,7 @@ def main():
     df = df.sort_index()
 
     history = df.iloc[-48 * 12 :]  # ~48 h at 5‑min resolution
-       last_obs_time = df.index.max()
+    last_obs_time = df.index.max()
 
     # stitch point must be absolute water level
     if "measured_gauge_height_ft" in df.columns:
