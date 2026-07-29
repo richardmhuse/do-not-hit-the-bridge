@@ -31,7 +31,7 @@ FORECAST_CSV = DATA_PROCESSED / "forecast.csv"
 FORECAST_JSON = DATA_PROCESSED / "forecast.json"
 TIDES_PATH = Path(DATA_RAW) / "tides.csv"
 
-HORIZON_HOURS = 12
+HORIZON_HOURS = 36
 STEP_HOURS = 1
 BLEND_ALPHA = 0.0  # 1.0 = pure residual, 0.0 = pure tide
 
