@@ -169,19 +169,28 @@ def _load_measured_csv() -> pd.DataFrame:
 
 
 def _load_ml_forecast() -> dict | None:
-    """Return the XGBoost forecast payload if present and fresh enough."""
-    if not LOCAL_FORECAST_PATH.exists():
-        return None
+    # 1) Local file (local dev / persistent disk)
+    if LOCAL_FORECAST_PATH.exists():
+        try:
+            with open(LOCAL_FORECAST_PATH) as f:
+                fc = json.load(f)
+            if fc.get("predicted_timestamps") and fc.get("predicted_values"):
+                return fc
+        except Exception:
+            logger.warning("Failed to read local forecast.json", exc_info=True)
+
+    # 2) Public GitHub raw (Render production)
     try:
-        with open(LOCAL_FORECAST_PATH) as f:
-            fc = json.load(f)
-        # Basic sanity check
-        if not fc.get("predicted_timestamps") or not fc.get("predicted_values"):
-            return None
-        return fc
+        resp = requests.get(FORECAST_URL, timeout=15)
+        if resp.status_code == 200:
+            fc = resp.json()
+            if fc.get("predicted_timestamps") and fc.get("predicted_values"):
+                logger.info("Loaded forecast from GitHub raw")
+                return fc
     except Exception:
-        logger.warning("Failed to read forecast.json", exc_info=True)
-        return None
+        logger.warning("Failed to fetch forecast from GitHub", exc_info=True)
+
+    return None
 
 
 def fetch_tide_data(force: bool = False) -> dict:
