@@ -155,21 +155,29 @@ def _predict_gap(view, time_col, smoothed_values, now_ts):
     )
 
 
-def _load_measured_csv() -> pd.DataFrame:
-    """Prefer local pipeline file; fall back to public GitHub raw URL."""
-    if LOCAL_MEASURED_PATH.exists():
-        logger.info("Loading measured data from local file: %s", LOCAL_MEASURED_PATH)
-        df = pd.read_csv(LOCAL_MEASURED_PATH)
-        return df
+def _prefer_remote() -> bool:
+    return os.environ.get("PREFER_REMOTE_DATA", "").lower() in ("1", "true", "yes")
 
-    logger.info("Local measured.csv not found – fetching from GitHub: %s", RAW_URL)
-    resp = requests.get(RAW_URL, timeout=20)
+
+def _load_measured_csv() -> pd.DataFrame:
+    """Prefer GitHub on Render; local file for offline dev."""
+    use_local = LOCAL_MEASURED_PATH.exists() and not _prefer_remote()
+
+    if use_local:
+        logger.info("Loading measured data from local file: %s", LOCAL_MEASURED_PATH)
+        return pd.read_csv(LOCAL_MEASURED_PATH)
+
+    url = f"{RAW_URL}?t={int(time.time())}"  # bust CDN cache
+    logger.info("Fetching measured data from GitHub: %s", RAW_URL)
+    resp = requests.get(url, timeout=20)
     resp.raise_for_status()
     return pd.read_csv(io.StringIO(resp.text))
 
 
 def _load_ml_forecast() -> dict | None:
-    if LOCAL_FORECAST_PATH.exists():
+    use_local = LOCAL_FORECAST_PATH.exists() and not _prefer_remote()
+
+    if use_local:
         try:
             with open(LOCAL_FORECAST_PATH) as f:
                 fc = json.load(f)
@@ -179,7 +187,6 @@ def _load_ml_forecast() -> dict | None:
             logger.warning("Failed to read local forecast.json", exc_info=True)
 
     try:
-        # bust CDN cache
         url = f"{FORECAST_URL}?t={int(time.time())}"
         resp = requests.get(url, timeout=15)
         if resp.status_code == 200:
@@ -191,7 +198,6 @@ def _load_ml_forecast() -> dict | None:
         logger.warning("Failed to fetch forecast from GitHub", exc_info=True)
 
     return None
-
 
 def fetch_tide_data(force: bool = False) -> dict:
     now = time.time()
