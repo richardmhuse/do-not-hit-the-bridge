@@ -169,7 +169,6 @@ def _load_measured_csv() -> pd.DataFrame:
 
 
 def _load_ml_forecast() -> dict | None:
-    # 1) Local file (local dev / persistent disk)
     if LOCAL_FORECAST_PATH.exists():
         try:
             with open(LOCAL_FORECAST_PATH) as f:
@@ -179,9 +178,10 @@ def _load_ml_forecast() -> dict | None:
         except Exception:
             logger.warning("Failed to read local forecast.json", exc_info=True)
 
-    # 2) Public GitHub raw (Render production)
     try:
-        resp = requests.get(FORECAST_URL, timeout=15)
+        # bust CDN cache
+        url = f"{FORECAST_URL}?t={int(time.time())}"
+        resp = requests.get(url, timeout=15)
         if resp.status_code == 200:
             fc = resp.json()
             if fc.get("predicted_timestamps") and fc.get("predicted_values"):
