@@ -14,6 +14,10 @@ services:
         value: main
       - key: DATA_PATH
         value: data/raw/measured.csv
+      - key: FORECAST_PATH
+        value: data/processed/forecast.json
+      - key: PREFER_REMOTE_DATA
+        value: "1"
       - key: CACHE_TTL_SECONDS
         value: "60"
       - key: HISTORY_DAYS
@@ -27,4 +31,3 @@ services:
       - key: MIN_WATER_DEPTH_FT
         value: "1.86"
     healthCheckPath: /healthz
-
