@@ -37,7 +37,7 @@ GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "richardmhuse")
 DATA_REPO = os.environ.get("DATA_REPO", "do-not-hit-the-bridge")
 DATA_BRANCH = os.environ.get("DATA_BRANCH", "main")
 DATA_PATH = os.environ.get("DATA_PATH", "data/raw/measured.csv")
-CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
+CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "60"))
 HISTORY_DAYS = float(os.environ.get("HISTORY_DAYS", "30"))
 
 SOURCE_DATA_TIMEZONE = os.environ.get("SOURCE_DATA_TIMEZONE", "America/New_York")
