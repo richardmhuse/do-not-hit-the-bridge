@@ -421,8 +421,8 @@ function buildTraces(data) {
   const hasPrediction = data.predicted_timestamps && data.predicted_timestamps.length > 1;
   if (hasPrediction) {
     traces.push({
-      x: toViewerPlotTimestamps(data.predicted_timestamps).slice(1),
-      y: data.predicted_values.slice(1),
+      x: toViewerPlotTimestamps(data.predicted_timestamps),
+      y: data.predicted_values,
       mode: "lines",
       line: {
         color: "#0A84FF",
