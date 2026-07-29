@@ -39,7 +39,7 @@ def main():
     # Pull a little extra history so the series is continuous
     today = date.today()
     start = today - timedelta(days=30)
-    end   = today + timedelta(days=2)
+    end   = today + timedelta(days=3)
 
     print(f"Fetching tides for station {TIDE_STATION_ID} ({start} → {end})...")
     new_data = fetch_tides(
