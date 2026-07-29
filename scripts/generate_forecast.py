@@ -226,7 +226,7 @@ def main():
     df = df.sort_index()
 
     history = df.iloc[-48 * 12 :]  # ~48 h at 5‑min resolution
-    last_obs_time = df.index.max()
+       last_obs_time = df.index.max()
 
     # stitch point must be absolute water level
     if "measured_gauge_height_ft" in df.columns:
@@ -236,20 +236,35 @@ def main():
     else:
         last_obs_value = float(df["tide_ft"].iloc[-1] + df[target].iloc[-1])
 
-    future_tides = load_future_tide(last_obs_time, hours=HORIZON_HOURS + 6)
-    print(f"Future tide points available: {len(future_tides)}")
+    now_ts = pd.Timestamp(datetime.now(timezone.utc))
+    # Always project far enough that the line ends at least HORIZON_HOURS past "now"
+    forecast_end = max(last_obs_time, now_ts) + pd.Timedelta(hours=HORIZON_HOURS)
+    total_hours = max(
+        float(HORIZON_HOURS),
+        (forecast_end - last_obs_time).total_seconds() / 3600.0,
+    )
+    total_hours = int(np.ceil(total_hours))
 
-    print(f"Generating {HORIZON_HOURS}h forecast (step={STEP_HOURS}h)…")
+    future_tides = load_future_tide(last_obs_time, hours=total_hours + 6)
+    print(f"Future tide points available: {len(future_tides)}")
+    print(
+        f"Generating forecast from {last_obs_time} → {forecast_end} "
+        f"({total_hours}h span, step={STEP_HOURS}h)…"
+    )
+
     forecast = recursive_forecast(
         model,
         feature_cols,
         history,
         target,
         future_tides,
-        horizon_hours=HORIZON_HOURS,
+        horizon_hours=total_hours,
         step_hours=STEP_HOURS,
         blend_alpha=BLEND_ALPHA,
     )
+
+    # Keep points from last observation onward (smooth stitch on the chart)
+    forecast = forecast[forecast.index >= last_obs_time]
 
     out = pd.DataFrame(
         {
@@ -261,7 +276,6 @@ def main():
 
     DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
     out.to_csv(FORECAST_CSV, index=False)
-
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "horizon_hours": HORIZON_HOURS,
