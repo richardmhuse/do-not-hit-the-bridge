@@ -13,9 +13,9 @@ services:
       - key: DATA_BRANCH
         value: main
       - key: DATA_PATH
-        value: data/measured.csv
+        value: data/raw/measured.csv
       - key: CACHE_TTL_SECONDS
-        value: "300"
+        value: "60"
       - key: HISTORY_DAYS
         value: "30"
       - key: INITIAL_VIEW_DAYS
