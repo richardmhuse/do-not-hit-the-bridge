@@ -44,6 +44,11 @@ SOURCE_DATA_TIMEZONE = os.environ.get("SOURCE_DATA_TIMEZONE", "America/New_York"
 
 # Local paths used by the new pipeline
 LOCAL_MEASURED_PATH = Path(os.environ.get("LOCAL_MEASURED_PATH", "data/raw/measured.csv"))
+FORECAST_PATH = os.environ.get("FORECAST_PATH", "data/processed/forecast.json")
+FORECAST_URL = (
+    f"https://raw.githubusercontent.com/"
+    f"{GITHUB_OWNER}/{DATA_REPO}/{DATA_BRANCH}/{FORECAST_PATH}"
+)
 LOCAL_FORECAST_PATH = Path(os.environ.get("LOCAL_FORECAST_PATH", "data/processed/forecast.json"))
 
 RAW_URL = (
