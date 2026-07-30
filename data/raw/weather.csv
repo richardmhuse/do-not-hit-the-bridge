@@ -206,3 +206,5 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-08-06 02:00:00+00:00,81,S,Partly Cloudy,False,6.0
 2026-08-06 03:00:00+00:00,80,S,Partly Cloudy,False,5.0
 2026-08-06 04:00:00+00:00,80,S,Partly Cloudy,False,5.0
+2026-08-06 05:00:00+00:00,79,SW,Slight Chance Showers And Thunderstorms,False,5.0
+2026-08-06 06:00:00+00:00,79,SW,Slight Chance Showers And Thunderstorms,False,5.0
