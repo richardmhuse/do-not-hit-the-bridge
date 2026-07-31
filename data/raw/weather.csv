@@ -233,3 +233,5 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-08-07 05:00:00+00:00,80,S,Partly Cloudy,False,3.0
 2026-08-07 06:00:00+00:00,80,S,Mostly Clear,False,5.0
 2026-08-07 07:00:00+00:00,79,S,Mostly Clear,False,5.0
+2026-08-07 08:00:00+00:00,78,S,Mostly Clear,False,3.0
+2026-08-07 09:00:00+00:00,78,SW,Mostly Clear,False,3.0
