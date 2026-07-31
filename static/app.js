@@ -639,25 +639,16 @@ async function refresh() {
     if (errorBanner) errorBanner.classList.remove("visible");
     setStatus(true);
 
-    if (readout) {
-      readout.innerHTML = `${data.latest_value.toFixed(2)}<span class="unit">ft</span>`;
-    }
+    lastPayload = data;
 
-    // Use the user's effective thresholds for the warning tint
-    const { minValue, maxValue } = getEffectiveThresholds();
-    const nearHigh = maxValue - data.latest_value <= WARNING_MARGIN_FT;
-    const nearLow = data.latest_value - minValue <= WARNING_MARGIN_FT;
-    if (readout) {
-      readout.classList.toggle("near-limit-high", nearHigh && !nearLow);
-      readout.classList.toggle("near-limit-low", nearLow);
-    }
+    // Large readout = live "Now" marker value (interpolated along the prediction)
+    updateReadout(data);
 
     if (readoutMeta) {
-      readoutMeta.textContent = `As of ${formatTimestamp(data.latest_timestamp)} · fetched ${formatTimestamp(data.fetched_at)}`;
+      readoutMeta.textContent = `Last measured reading ${data.latest_value.toFixed(2)} ft at ${formatTimestamp(data.latest_timestamp)}`;
     }
 
     const traces = buildTraces(data);
-    lastPayload = data;
     nowTraceIndex = traces.length - 1;
 
     const { shapes, annotations } = buildThresholdShapesAndAnnotations();
@@ -701,7 +692,25 @@ async function refresh() {
 }
 
 /**
- * Runs every second so the "now" marker keeps moving.
+ * Updates the large readout + warning tint from the live "Now" value.
+ */
+function updateReadout(payload) {
+  if (!payload) return;
+  const { value } = interpolateNowValue(payload, Date.now());
+  if (readout) {
+    readout.innerHTML = `${value.toFixed(2)}<span class="unit">ft</span>`;
+  }
+  const { minValue, maxValue } = getEffectiveThresholds();
+  const nearHigh = maxValue - value <= WARNING_MARGIN_FT;
+  const nearLow = value - minValue <= WARNING_MARGIN_FT;
+  if (readout) {
+    readout.classList.toggle("near-limit-high", nearHigh && !nearLow);
+    readout.classList.toggle("near-limit-low", nearLow);
+  }
+}
+
+/**
+ * Runs every second so the "now" marker (and the large readout) keep moving.
  */
 function tickNowMarker() {
   if (!lastPayload || nowTraceIndex === null || !chartInitialized) return;
@@ -709,6 +718,7 @@ function tickNowMarker() {
   const { utcIso, value } = interpolateNowValue(lastPayload, nowMs);
   const displayX = toViewerPlotTimestamp(utcIso);
   Plotly.restyle("chart", { x: [[displayX]], y: [[value]] }, [nowTraceIndex]);
+  updateReadout(lastPayload);
 }
 
 /* ------------------------------------------------------------------ */
