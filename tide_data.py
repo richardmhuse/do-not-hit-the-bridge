@@ -1,3 +1,91 @@
+Ctrl+K
+Ctrl+J
+
+
+
+app.py
+
+render.yaml
+
+.gitignore
+
+tide_data.py.url
+
+tide_data.py.url_Zone.Identifier
+
+app.js
+I have a web app rendered through render.com, the code ad data is hosted on my github repository. The data is supposed to refresh every minute on render.com based off the information in combined.csv but it is only updating whenever a new commit is deployed in render.com. Here are the main scripts for this. Fix this so render.com refreshes every minute based off the data hosted in github.
+
+
+Worked for 2m 47s
+The problem
+
+On Render the whole repo (including data/raw/measured.csv) is present on disk.
+Your original logic was:
+
+use_local = LOCAL_MEASURED_PATH.exists() and not _prefer_remote()
+If PREFER_REMOTE_DATA was missing/empty for any reason, the app used the local file from the last deploy. That file only changes when Render rebuilds — which is exactly the behaviour you saw.
+
+The GitHub Actions pipeline is updating data/raw/measured.csv (roughly every 1–2 h right now). The browser already polls /api/data every 60 s. The missing piece was forcing the server to always pull the live file from GitHub.
+
+What I changed in tide_data.py
+
+_prefer_remote() is now much more aggressive
+It returns True when either:
+PREFER_REMOTE_DATA is truthy, or
+the RENDER environment variable is set (Render always sets this).
+Stronger cache-busting when fetching from raw.githubusercontent.com
+Query-string timestamp + explicit Cache-Control: no-cache headers so GitHub’s CDN is less likely to hand you a stale copy.
+Graceful fallback
+If the GitHub fetch fails, it still falls back to the local file so the dashboard stays up.
+Clearer log lines so you can see in the Render logs whether it used remote or local.
+render.yaml already had PREFER_REMOTE_DATA=1; that is still correct.
+
+What you need to do
+
+Copy the new tide_data.py into your repo (replace the existing one).
+Commit + push. Render will redeploy.
+After deploy, open the site and watch the “As of …” timestamp / the live value. It should now track the latest row in GitHub’s data/raw/measured.csv within ~60 s of a new commit appearing there (the server-side cache TTL).
+Note about update frequency
+
+The data itself is only written to GitHub when your Actions workflow runs (“Auto-update: …”). Right now that looks like every 1–2 hours, not every minute. The dashboard polls every minute; it can only show data as fresh as the last commit to measured.csv. If you want true minute-level updates you’ll need to make the pipeline that writes the CSV run more often (or point the app at a different live source).
+
+If you actually want the app to read data/processed/combined.csv instead of measured.csv, just change the DATA_PATH env var in render.yaml (and make sure the column-detection logic still finds a usable timestamp + value column).
+
+
+
+
+20 sources
+Update tide_data.py remote fetch logic
+
+
+Worked for 8s
+Did you deliver the updated copy of tide_data.py and render.yaml? I can't see a link to the new copies.
+
+
+Worked for 6s
+
+What changed in tide_data.py (remote-fetch logic)
+
+_prefer_remote() now returns True when either:
+PREFER_REMOTE_DATA is set, or
+Render’s own RENDER env var is present
+→ stops the app from serving the stale data/raw/measured.csv that was baked into the last deploy.
+_fetch_github_raw() adds aggressive cache-busting:
+timestamp + extra query param
+Cache-Control: no-cache / Pragma: no-cache headers
+On GitHub failure it still falls back to the local file so the dashboard stays up.
+render.yaml is unchanged in substance (still has PREFER_REMOTE_DATA=1); it was just re-written cleanly.
+
+To deploy
+
+Replace tide_data.py in your repo with the downloaded copy.
+Commit + push (or paste the file if you prefer).
+Render will redeploy; after that the live value should track GitHub within ~60 s of each new commit to data/raw/measured.csv.
+
+
+
+tide_data.py
 """
 tide_data.py
 
@@ -5,8 +93,8 @@ Loads measured gauge data and (when available) the XGBoost forecast,
 then returns the payload the dashboard expects.
 
 Priority for measured data:
-  1. Local file  data/raw/measured.csv   (written by the pipeline / Cron)
-  2. Public GitHub raw URL               (fallback so the site stays up)
+  1. Public GitHub raw URL               (always preferred on Render / when PREFER_REMOTE_DATA=1)
+  2. Local file  data/raw/measured.csv   (offline / local dev only)
 
 Priority for the prediction line:
   1. data/processed/forecast.json        (XGBoost multi-step forecast)
@@ -156,26 +244,73 @@ def _predict_gap(view, time_col, smoothed_values, now_ts):
 
 
 def _prefer_remote() -> bool:
-    return os.environ.get("PREFER_REMOTE_DATA", "").lower() in ("1", "true", "yes")
+    """
+    Always prefer live GitHub data when:
+      - PREFER_REMOTE_DATA is truthy, OR
+      - we are running on Render (RENDER env is set by the platform).
+    This prevents the app from serving the stale copy of measured.csv
+    that was baked into the last deploy.
+    """
+    if os.environ.get("PREFER_REMOTE_DATA", "").lower() in ("1", "true", "yes"):
+        return True
+    # Render sets RENDER=true on every service
+    if os.environ.get("RENDER", "").lower() in ("1", "true", "yes"):
+        return True
+    return False
+
+
+def _fetch_github_raw(url: str, timeout: int = 20) -> str:
+    """
+    Fetch a raw.githubusercontent.com file with aggressive cache-busting.
+    GitHub's CDN can hold onto content even after commits; the query-string
+    + no-cache headers force a fresh edge response most of the time.
+    """
+    bust = int(time.time())
+    # Also append a random-ish component so intermediate proxies can't coalesce
+    full_url = f"{url}?t={bust}&_={bust % 100000}"
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "User-Agent": "WhiskeyTidesDashboard/1.0",
+    }
+    resp = requests.get(full_url, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    return resp.text
 
 
 def _load_measured_csv() -> pd.DataFrame:
-    """Prefer GitHub on Render; local file for offline dev."""
-    use_local = LOCAL_MEASURED_PATH.exists() and not _prefer_remote()
+    """Prefer GitHub on Render; local file for offline dev only."""
+    prefer_remote = _prefer_remote()
+    use_local = LOCAL_MEASURED_PATH.exists() and not prefer_remote
 
     if use_local:
         logger.info("Loading measured data from local file: %s", LOCAL_MEASURED_PATH)
         return pd.read_csv(LOCAL_MEASURED_PATH)
 
-    url = f"{RAW_URL}?t={int(time.time())}"  # bust CDN cache
-    logger.info("Fetching measured data from GitHub: %s", RAW_URL)
-    resp = requests.get(url, timeout=20)
-    resp.raise_for_status()
-    return pd.read_csv(io.StringIO(resp.text))
+    logger.info(
+        "Fetching measured data from GitHub (prefer_remote=%s): %s",
+        prefer_remote,
+        RAW_URL,
+    )
+    try:
+        text = _fetch_github_raw(RAW_URL, timeout=20)
+        return pd.read_csv(io.StringIO(text))
+    except Exception as exc:
+        # Last-resort fallback so the dashboard stays up if GitHub is briefly down
+        if LOCAL_MEASURED_PATH.exists():
+            logger.warning(
+                "GitHub fetch failed (%s); falling back to local file %s",
+                exc,
+                LOCAL_MEASURED_PATH,
+            )
+            return pd.read_csv(LOCAL_MEASURED_PATH)
+        raise
 
 
 def _load_ml_forecast() -> dict | None:
-    use_local = LOCAL_FORECAST_PATH.exists() and not _prefer_remote()
+    prefer_remote = _prefer_remote()
+    use_local = LOCAL_FORECAST_PATH.exists() and not prefer_remote
 
     if use_local:
         try:
@@ -187,17 +322,26 @@ def _load_ml_forecast() -> dict | None:
             logger.warning("Failed to read local forecast.json", exc_info=True)
 
     try:
-        url = f"{FORECAST_URL}?t={int(time.time())}"
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 200:
-            fc = resp.json()
-            if fc.get("predicted_timestamps") and fc.get("predicted_values"):
-                logger.info("Loaded forecast from GitHub raw")
-                return fc
+        text = _fetch_github_raw(FORECAST_URL, timeout=15)
+        fc = json.loads(text)
+        if fc.get("predicted_timestamps") and fc.get("predicted_values"):
+            logger.info("Loaded forecast from GitHub raw")
+            return fc
     except Exception:
         logger.warning("Failed to fetch forecast from GitHub", exc_info=True)
+        # fallback to local if present
+        if LOCAL_FORECAST_PATH.exists():
+            try:
+                with open(LOCAL_FORECAST_PATH) as f:
+                    fc = json.load(f)
+                if fc.get("predicted_timestamps") and fc.get("predicted_values"):
+                    logger.info("Using local forecast.json as fallback")
+                    return fc
+            except Exception:
+                pass
 
     return None
+
 
 def fetch_tide_data(force: bool = False) -> dict:
     now = time.time()
@@ -258,7 +402,7 @@ def fetch_tide_data(force: bool = False) -> dict:
         "gap_minutes": gap_minutes,
         "value_column": value_col,
         "time_column": time_col,
-        "source_url": str(LOCAL_MEASURED_PATH) if LOCAL_MEASURED_PATH.exists() else RAW_URL,
+        "source_url": RAW_URL if _prefer_remote() else str(LOCAL_MEASURED_PATH),
         "fetched_at": now_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "latest_value": float(smoothed_values[-1]),
         "latest_timestamp": last_ts.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -268,3 +412,4 @@ def fetch_tide_data(force: bool = False) -> dict:
     _cache["timestamp"] = now
     _cache["payload"] = payload
     return payload
+Render.com: Force GitHub Data Refresh - Grok
