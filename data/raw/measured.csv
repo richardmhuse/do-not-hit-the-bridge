@@ -3082,3 +3082,9 @@ timestamp,value,parameter,code
 2026-08-03 08:55:10,1.38,gauge_height_ft,00065
 2026-08-03 09:00:10,1.44,gauge_height_ft,00065
 2026-08-03 09:05:10,1.52,gauge_height_ft,00065
+2026-08-03 09:10:10,1.6,gauge_height_ft,00065
+2026-08-03 09:15:10,1.67,gauge_height_ft,00065
+2026-08-03 09:20:10,1.73,gauge_height_ft,00065
+2026-08-03 09:25:10,1.83,gauge_height_ft,00065
+2026-08-03 09:30:10,1.91,gauge_height_ft,00065
+2026-08-03 09:35:10,1.99,gauge_height_ft,00065
