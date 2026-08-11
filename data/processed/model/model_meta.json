@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-08-11T16:59:38.535984+00:00",
+  "trained_at": "2026-08-11T17:57:56.756157+00:00",
   "target": "tide_residual",
   "feature_cols": [
     "tide_ft",
