@@ -1,5 +1,5 @@
 {
-  "trained_at": "2026-09-15T05:56:37.975942+00:00",
+  "trained_at": "2026-09-15T11:15:20.503418+00:00",
   "target": "tide_residual",
   "feature_cols": [
     "tide_ft",
@@ -33,10 +33,10 @@
     "tide_residual_lag12",
     "tide_residual_lag24"
   ],
-  "n_train": 7535,
-  "n_test": 551,
-  "mae": 0.03225568149111719,
-  "rmse": 0.058248465920957,
+  "n_train": 7584,
+  "n_test": 565,
+  "mae": 0.03498321916662832,
+  "rmse": 0.0636532660930143,
   "test_days": 2,
   "xgb_params": {
     "n_estimators": 400,
