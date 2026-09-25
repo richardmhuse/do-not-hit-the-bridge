@@ -1557,3 +1557,8 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-10-01 09:00:00+00:00,71,SW,Partly Cloudy,False,3.0
 2026-10-01 10:00:00+00:00,70,SW,Mostly Sunny,True,3.0
 2026-10-01 11:00:00+00:00,70,SW,Mostly Sunny,True,3.0
+2026-10-01 12:00:00+00:00,71,SW,Slight Chance Rain Showers,True,3.0
+2026-10-01 13:00:00+00:00,74,SW,Slight Chance Rain Showers,True,5.0
+2026-10-01 14:00:00+00:00,77,S,Slight Chance Rain Showers,True,6.0
+2026-10-01 15:00:00+00:00,80,S,Slight Chance Rain Showers,True,7.0
+2026-10-01 16:00:00+00:00,81,S,Slight Chance Rain Showers,True,8.0
