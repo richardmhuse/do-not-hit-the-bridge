@@ -1843,3 +1843,6 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-10-13 07:00:00+00:00,67,NW,Partly Cloudy,False,6.0
 2026-10-13 08:00:00+00:00,66,N,Partly Cloudy,False,6.0
 2026-10-13 09:00:00+00:00,65,N,Partly Cloudy,False,6.0
+2026-10-13 10:00:00+00:00,65,N,Mostly Sunny,True,6.0
+2026-10-13 11:00:00+00:00,64,N,Mostly Sunny,True,7.0
+2026-10-13 12:00:00+00:00,65,N,Mostly Sunny,True,7.0
