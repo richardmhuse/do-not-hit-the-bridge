@@ -2182,3 +2182,9 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-10-27 10:00:00+00:00,54,N,Sunny,True,6.0
 2026-10-27 11:00:00+00:00,54,N,Sunny,True,7.0
 2026-10-27 12:00:00+00:00,54,N,Mostly Sunny,True,7.0
+2026-10-27 13:00:00+00:00,57,N,Sunny,True,9.0
+2026-10-27 14:00:00+00:00,60,NE,Sunny,True,9.0
+2026-10-27 15:00:00+00:00,64,NE,Mostly Sunny,True,9.0
+2026-10-27 16:00:00+00:00,67,NE,Mostly Sunny,True,10.0
+2026-10-27 17:00:00+00:00,70,NE,Mostly Sunny,True,10.0
+2026-10-27 18:00:00+00:00,72,NE,Mostly Sunny,True,10.0
