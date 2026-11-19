@@ -2886,3 +2886,12 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-11-25 18:00:00+00:00,61,NE,Chance Rain Showers,True,16.0
 2026-11-25 19:00:00+00:00,62,NE,Chance Rain Showers,True,17.0
 2026-11-25 20:00:00+00:00,62,NE,Chance Rain Showers,True,17.0
+2026-11-25 21:00:00+00:00,64,NE,Rain Showers Likely,True,17.0
+2026-11-25 22:00:00+00:00,62,NE,Rain Showers Likely,True,16.0
+2026-11-25 23:00:00+00:00,59,NE,Rain Showers Likely,False,15.0
+2026-11-26 00:00:00+00:00,57,NE,Chance Rain Showers,False,14.0
+2026-11-26 01:00:00+00:00,56,NE,Chance Rain Showers,False,14.0
+2026-11-26 02:00:00+00:00,55,NE,Chance Rain Showers,False,13.0
+2026-11-26 03:00:00+00:00,54,NE,Chance Rain Showers,False,12.0
+2026-11-26 04:00:00+00:00,53,N,Chance Rain Showers,False,10.0
+2026-11-26 05:00:00+00:00,53,N,Chance Rain Showers,False,10.0
