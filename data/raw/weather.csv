@@ -2975,3 +2975,12 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-11-29 11:00:00+00:00,44,W,Mostly Sunny,True,5.0
 2026-11-29 12:00:00+00:00,44,W,Mostly Sunny,True,5.0
 2026-11-29 13:00:00+00:00,48,W,Mostly Sunny,True,6.0
+2026-11-29 14:00:00+00:00,53,W,Sunny,True,5.0
+2026-11-29 15:00:00+00:00,57,W,Sunny,True,5.0
+2026-11-29 16:00:00+00:00,60,W,Sunny,True,6.0
+2026-11-29 17:00:00+00:00,62,W,Sunny,True,6.0
+2026-11-29 18:00:00+00:00,63,SW,Sunny,True,7.0
+2026-11-29 19:00:00+00:00,64,SW,Sunny,True,7.0
+2026-11-29 20:00:00+00:00,64,SW,Sunny,True,6.0
+2026-11-29 21:00:00+00:00,64,SW,Sunny,True,6.0
+2026-11-29 22:00:00+00:00,61,SW,Sunny,True,5.0
