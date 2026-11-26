@@ -3059,3 +3059,12 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-12-02 23:00:00+00:00,59,N,Mostly Clear,False,5.0
 2026-12-03 00:00:00+00:00,56,N,Mostly Clear,False,3.0
 2026-12-03 01:00:00+00:00,55,N,Mostly Clear,False,3.0
+2026-12-03 02:00:00+00:00,54,N,Partly Cloudy,False,2.0
+2026-12-03 03:00:00+00:00,53,N,Partly Cloudy,False,2.0
+2026-12-03 04:00:00+00:00,53,N,Partly Cloudy,False,2.0
+2026-12-03 05:00:00+00:00,53,N,Partly Cloudy,False,2.0
+2026-12-03 06:00:00+00:00,53,N,Partly Cloudy,False,2.0
+2026-12-03 07:00:00+00:00,52,N,Partly Cloudy,False,2.0
+2026-12-03 08:00:00+00:00,52,N,Partly Cloudy,False,2.0
+2026-12-03 09:00:00+00:00,51,N,Partly Cloudy,False,2.0
+2026-12-03 10:00:00+00:00,50,N,Partly Cloudy,False,2.0
