@@ -3086,3 +3086,11 @@ t,temperature_f,wind_direction,short_forecast,is_daytime,wind_speed_mph
 2026-12-04 02:00:00+00:00,61,SE,Mostly Cloudy,False,3.0
 2026-12-04 03:00:00+00:00,60,SE,Mostly Cloudy,False,3.0
 2026-12-04 04:00:00+00:00,60,SE,Mostly Cloudy,False,3.0
+2026-12-04 05:00:00+00:00,58,S,Mostly Cloudy,False,2.0
+2026-12-04 06:00:00+00:00,58,SW,Mostly Cloudy,False,2.0
+2026-12-04 07:00:00+00:00,58,SW,Mostly Cloudy,False,2.0
+2026-12-04 08:00:00+00:00,58,S,Mostly Cloudy,False,2.0
+2026-12-04 09:00:00+00:00,58,S,Mostly Cloudy,False,2.0
+2026-12-04 10:00:00+00:00,58,S,Mostly Cloudy,False,2.0
+2026-12-04 11:00:00+00:00,58,S,Partly Sunny,True,3.0
+2026-12-04 12:00:00+00:00,58,S,Slight Chance Rain Showers,True,3.0
